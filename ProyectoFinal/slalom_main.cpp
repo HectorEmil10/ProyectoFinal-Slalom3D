@@ -309,6 +309,9 @@ GLuint CargarSkybox(const char* caras[6]);
 float AlphaMensaje(double inicio, float sostener, float desvanecer);
 void  DibujarHUD(Shader& hudShader);
 
+//xcc- HUD para las opciones del Hub
+void DibujarHUDHub(Shader& hudShader);
+
 // ============================================================================
 //  ETAPA 6. PROGRAMA PRINCIPAL
 // ============================================================================
@@ -664,9 +667,12 @@ int main()
 
 
 
-
-        //xcc- HUD visible solo en la pista
-        if (escenaActual == ESCENA_PISTA)
+        //xcc- muestra el HUD correspondiente a cada escena
+        if (escenaActual == ESCENA_HUB)
+        {
+            DibujarHUDHub(hudShader);
+        }
+        else if (escenaActual == ESCENA_PISTA)
         {
             DibujarHUD(hudShader);
         }
@@ -1061,6 +1067,28 @@ static void DibujarTexto(Shader& hud, const std::string& texto, float x, float y
  *        prueba de profundidad.
  * @param hudShader Shader del HUD.
  */
+
+ //xcc- muestra la dificultad seleccionada en el Hub
+void DibujarHUDHub(Shader& hudShader)
+{
+    glDisable(GL_DEPTH_TEST);
+    hudShader.Use();
+
+    glm::mat4 ortho = glm::ortho( 0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT, 0.0f);
+
+    glUniformMatrix4fv( glGetUniformLocation(hudShader.Program, "ortho"), 1, GL_FALSE, glm::value_ptr(ortho));
+
+    float e = SCREEN_HEIGHT / 800.0f;
+
+    //xcc- instrucciones de seleccion
+    DibujarTexto( hudShader, "SELECCIONA DIFICULTAD: 1 2 3", 20.0f * e, 20.0f * e, 3.0f * e, glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), false);
+
+    //xcc- muestra la opcion actual
+    DibujarTexto( hudShader, NOMBRES_NIVEL[nivelActual], 20.0f * e, 60.0f * e, 3.0f * e, glm::vec4(1.0f, 0.85f, 0.4f, 1.0f), false);
+
+    glEnable(GL_DEPTH_TEST);
+}
+
 void DibujarHUD(Shader& hudShader)
 {
     glDisable(GL_DEPTH_TEST);
@@ -1190,6 +1218,28 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         else if (action == GLFW_RELEASE) keys[key] = false;
     }
 
+
+    //xcc- cambia del Hub a la pista cerca de la salida donde dice "pista"
+    if (key == GLFW_KEY_E && action == GLFW_PRESS && escenaActual == ESCENA_HUB)
+    {
+        glm::vec3 posicionCamara = camera.GetPosition();
+
+        //xcc- zona de salida trasera del Hub
+        if (posicionCamara.z < -12.0f &&
+            posicionCamara.x > -5.0f &&
+            posicionCamara.x < 5.0f)
+        {
+            escenaActual = ESCENA_PISTA;
+            modoCamara = 1;
+
+            skierPos = posSalida;
+            estadoCarrera = 0;
+            velActual = 0.0f;
+
+            std::cout << "Cambio de escena: Hub -> Pista" << std::endl;
+        }
+    }
+
     // Cambio de cámara
     if (key == GLFW_KEY_C && action == GLFW_PRESS)
     {
@@ -1221,7 +1271,11 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
     }
 
     // Inicio de carrera
-    if (key == GLFW_KEY_R && action == GLFW_PRESS)
+    
+    //xcc- inicia la carrera solo desde la pista
+    if (key == GLFW_KEY_R && action == GLFW_PRESS && escenaActual == ESCENA_PISTA)
+
+
     {
         skierPos = posSalida;
         estadoCarrera = 1;
@@ -1245,12 +1299,13 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
     }
 
     // Niveles de dificultad y clima (la transición se interpola en ActualizarAmbiente)
-    if (action == GLFW_PRESS && key >= GLFW_KEY_1 && key <= GLFW_KEY_3)
+    //xcc- selecciona dificultad y clima desde el Hub
+    if (action == GLFW_PRESS && key >= GLFW_KEY_1 && key <= GLFW_KEY_3 && escenaActual == ESCENA_HUB)
     {
         nivelActual = key - GLFW_KEY_1;
         ajusteNieblaManual = 0.0f;
-        tiempoMensajeNivel = glfwGetTime();
-        std::cout << "Dificultad/Clima: " << NOMBRES_NIVEL[nivelActual] << std::endl;
+
+        std::cout << "Seleccion en Hub: " << NOMBRES_NIVEL[nivelActual] << std::endl;
     }
 }
 
