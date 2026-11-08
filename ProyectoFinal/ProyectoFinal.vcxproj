@@ -36,7 +36,7 @@
     <None Include="Shader\skybox.frag" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="slalom_main.cpp" />
+    <ClCompile Include="slalom_main_v2.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

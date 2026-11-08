@@ -24,20 +24,28 @@
  *        - Niebla (fog) de intensidad variable.
  *        - Skybox (cubemap) con paisaje montañoso alrededor de la escena.
  *        - Cámara de inspección (libre) y cámara en tercera persona.
- *        - Lógica de carrera con cronómetro, límites laterales de pista y
- *          mensajes en pantalla (HUD) con desvanecimiento gradual.
+ *        - Control manual del esquiador (avance, freno y giro lateral).
+ *        - Colisiones con el terreno, límites laterales, árboles y rocas.
+ *        - Lógica de carrera con cronómetro; la victoria se registra solo
+ *          al cruzar la línea de meta. Mensajes en pantalla (HUD) con
+ *          desvanecimiento gradual.
  *        - Tres niveles de dificultad/clima con transición suave.
+ *        - Efecto de ventisca (nieve golpeando la cámara) activable.
  *
  *  Controles:
- *      W/A/S/D o flechas : mover cámara de inspección / esquiar lateralmente
- *      Mouse             : orientar cámara de inspección
- *      C                 : alternar cámara (inspección / tercera persona)
- *      R                 : iniciar descenso        T : volver a la salida
- *      1 / 2 / 3         : nivel de dificultad y clima
- *      N / M             : aumentar / disminuir niebla manualmente
- *      P                 : imprimir coordenada de cámara
- *      F1 / F2           : fijar punto de SALIDA / META en la cámara actual
- *      ESC               : salir
+ *      W / Flecha arriba    : avanzar (3ª persona) / mover cámara (inspección)
+ *      S / Flecha abajo     : frenar (3ª persona) / retroceder cámara
+ *      A / D, Flechas izq/der: esquiar lateralmente / mover cámara
+ *      Mouse                : orientar cámara de inspección
+ *      C                    : alternar cámara (inspección / tercera persona)
+ *      R                    : iniciar descenso        T : volver a la salida
+ *      1 / 2 / 3            : nivel de dificultad y clima (solo en la salida)
+ *      V                    : activar / desactivar ventisca
+ *      N / M                : aumentar / disminuir niebla manualmente
+ *      F3                   : mostrar / ocultar colisionadores (depuración)
+ *      P                    : imprimir coordenada de cámara
+ *      F1 / F2              : fijar punto de SALIDA / META en la cámara actual
+ *      ESC                  : salir
  * ============================================================================
  */
 
@@ -49,8 +57,10 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cctype>
 
 // GLEW y GLFW
@@ -75,15 +85,42 @@
 // ---- Ventana ----
 const GLuint WIDTH = 1200, HEIGHT = 800;
 
+// ---- Cámara ----
+const float ANGULO_GIRO_ESQUIADOR = 18.0f;  // Inclinación del esquiador al desplazarse (grados)
+const float FOV_BASE_GRADOS       = 58.0f;  // Campo de visión base (grados)
+const float FOV_MAXIMO_GRADOS     = 100.0f; // Tope de seguridad del campo de visión
+
 // ---- Pista ----
-const float ANCHO_MEDIO_PISTA    = 22.0f;  // Distancia máxima al eje de la pista (unidades)
-const float SEPARACION_POSTES    = 20.0f;  // Separación entre postes de límite a lo largo de la pista
-const float ALTURA_POSTE         = 6.0f;   // Altura visual de los postes de límite
+const float ANCHO_MEDIO_PISTA    = 60.0f;   // Distancia máxima al eje de la pista (unidades)
+const float SEPARACION_POSTES    = 20.0f;   // Separación entre postes de límite a lo largo de la pista
+const float ALTURA_POSTE         = 6.0f;    // Altura visual de los postes de límite
+const float PASO_MUESTREO_ALTURA = 2.0f;    // Paso del recorrido para seguir la superficie (unidades)
+const float DESFASE_POSTE        = 0.2f;    // Hundimiento de la base para ocultar huecos en pendiente
+
+// ---- Control del esquiador ----
+const float ACELERACION_AVANCE = 1.2f;      // Rapidez para alcanzar la velocidad máxima (1/s)
+const float FRICCION_LIBRE     = 0.7f;      // Desaceleración al soltar el avance (1/s)
+const float FRENADO            = 4.0f;      // Desaceleración al frenar (1/s)
+const float RADIO_ESQUIADOR    = 1.1f;      // Radio de colisión del esquiador en el plano XZ
+
+// ---- Obstáculos (detección automática de árboles y rocas) ----
+const float MAX_ANCHO_OBSTACULO     = 14.0f; // Objetos más anchos se ignoran (terreno, carteles)
+const float MIN_ANCHO_OBSTACULO     = 0.3f;  // Objetos más angostos se ignoran
+const float MIN_ALTO_OBSTACULO      = 0.4f;  // Objetos más bajos se ignoran
+const float RADIO_MINIMO_OBSTACULO  = 0.8f;  // Radio de colisión mínimo
+const float FACTOR_RADIO_ARBOL      = 0.20f; // Radio del tronco respecto al ancho del árbol
+const float FACTOR_RADIO_ROCA       = 0.45f; // Radio de la roca respecto a su ancho
+const float FACTOR_VEL_CHOQUE       = 0.30f; // Fracción de la velocidad máxima permitida en contacto
+const float ZONA_LIBRE_SALIDA_META  = 15.0f; // Radio alrededor de salida/meta sin colisiones
+
+// ---- Ventisca ----
+const int   MAX_COPOS               = 450;    // Cantidad máxima de copos en pantalla
+const float NIEBLA_EXTRA_VENTISCA   = 0.0025f; // Densidad de niebla adicional con ventisca total
 
 // ---- Mensajes en pantalla (segundos) ----
-const float TIEMPO_MENSAJE_META  = 5.0f;   // Tiempo que permanece el resultado visible
-const float TIEMPO_DESVANECER    = 2.0f;   // Duración del desvanecimiento posterior
-const float TIEMPO_MENSAJE_CORTO = 1.5f;   // Mensajes breves (salida, cambio de nivel, límite)
+const float TIEMPO_MENSAJE_META  = 5.0f;    // Tiempo que permanece el resultado visible
+const float TIEMPO_DESVANECER    = 2.0f;    // Duración del desvanecimiento posterior
+const float TIEMPO_MENSAJE_CORTO = 1.5f;    // Mensajes breves (salida, cambio de nivel, límite)
 
 // ---- Cielo ----
 // Orden de caras del cubemap: +X, -X, +Y, -Y, +Z, -Z
@@ -106,7 +143,7 @@ const char* CARAS_SKYBOX[6] = {
  */
 struct ParametrosAmbiente
 {
-    float     velocidadDescenso;   // Velocidad objetivo de descenso
+    float     velocidadDescenso;   // Velocidad máxima de descenso
     float     velocidadLateral;    // Velocidad de desplazamiento lateral
     float     densidadNiebla;      // Densidad de la niebla exponencial
     float     intensidadSol;       // Intensidad de la luz direccional
@@ -115,6 +152,29 @@ struct ParametrosAmbiente
     glm::vec3 colorNiebla;         // Color de la niebla / bruma
     glm::vec3 colorSol;            // Color de la luz direccional
     glm::vec3 colorAmbiente;       // Color de la luz ambiental
+};
+
+/**
+ * @brief Obstáculo físico (árbol o roca) modelado como cilindro vertical.
+ */
+struct Obstaculo
+{
+    glm::vec3 centro;   // Centro en XZ (y sin uso)
+    float     radio;    // Radio de colisión en el plano XZ
+    float     yMin;     // Base del objeto
+    float     yMax;     // Parte superior del objeto
+    bool      esArbol;  // true = árbol, false = roca
+};
+
+/**
+ * @brief Copo de nieve en coordenadas de pantalla normalizadas.
+ */
+struct Copo
+{
+    float u;      // Posición horizontal [0, 1)
+    float v;      // Posición vertical [0, 1)
+    float z;      // Profundidad [0, 1): 0 = lejano, 1 = cercano
+    float fase;   // Fase de turbulencia
 };
 
 /**
@@ -179,11 +239,25 @@ double tiempoFinalCarrera  = 0.0;
 std::vector<glm::vec3> postesLimite;                  // Posición base de cada poste
 bool reconstruirLimites = false;                      // Se activa al mover salida/meta (F1/F2)
 
+// ---- Obstáculos ----
+std::vector<Obstaculo> obstaculos;                    // Árboles y rocas detectados en el modelo
+bool mostrarColisionadores = false;                   // Depuración (F3)
+
+// ---- Ventisca ----
+std::vector<Copo> copos;                              // Copos de nieve
+bool  ventiscaActiva = false;                         // Estado solicitado por el usuario (V)
+float intensidadVentisca = 0.0f;                      // Intensidad suavizada [0, 1]
+float vientoVentisca = 0.0f;                          // Velocidad del viento (fracción de pantalla / s)
+
 // ---- Mensajes del HUD (instante de inicio; negativo = inactivo) ----
-double tiempoMensajeSalida = -1.0;
-double tiempoMensajeMeta   = -1.0;
-double tiempoAvisoLimite   = -1.0;
-double tiempoMensajeNivel  = -1.0;
+double tiempoMensajeSalida    = -1.0;
+double tiempoMensajeMeta      = -1.0;
+double tiempoAvisoLimite      = -1.0;
+double tiempoMensajeNivel     = -1.0;
+double tiempoAvisoNivel       = -1.0;
+double tiempoAvisoChoque      = -1.0;
+double tiempoAyudaControles   = -1.0;
+double tiempoMensajeVentisca  = -1.0;
 
 // ---- Dificultad / clima ----
 int nivelActual = 0;
@@ -210,7 +284,7 @@ glm::vec3 pointLightPositions[] = {
 };
 
 // ---- Geometría auxiliar ----
-// Cubo unitario (indicador del esquiador y postes de límite)
+// Cubo unitario (indicador del esquiador, postes de límite y colisionadores)
 float verticesCubo[] = {
     -0.5f, -0.5f,  0.5f,   0.5f, -0.5f,  0.5f,   0.5f,  0.5f,  0.5f,
      0.5f,  0.5f,  0.5f,  -0.5f,  0.5f,  0.5f,  -0.5f, -0.5f,  0.5f,
@@ -268,22 +342,27 @@ static const Glifo GLIFOS[] = {
     { '-', { 0x00, 0x00, 0x00, 0x1F, 0x00, 0x00, 0x00 } },
     { '!', { 0x04, 0x04, 0x04, 0x04, 0x04, 0x00, 0x04 } },
     { 'A', { 0x0E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11 } },
+    { 'B', { 0x1E, 0x11, 0x11, 0x1E, 0x11, 0x11, 0x1E } },
     { 'C', { 0x0E, 0x11, 0x10, 0x10, 0x10, 0x11, 0x0E } },
     { 'D', { 0x1E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1E } },
     { 'E', { 0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x1F } },
     { 'F', { 0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x10 } },
     { 'G', { 0x0E, 0x11, 0x10, 0x17, 0x11, 0x11, 0x0F } },
+    { 'H', { 0x11, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11 } },
     { 'I', { 0x0E, 0x04, 0x04, 0x04, 0x04, 0x04, 0x0E } },
+    { 'J', { 0x07, 0x02, 0x02, 0x02, 0x02, 0x12, 0x0C } },
     { 'L', { 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1F } },
     { 'M', { 0x11, 0x1B, 0x15, 0x15, 0x11, 0x11, 0x11 } },
     { 'N', { 0x11, 0x19, 0x15, 0x13, 0x11, 0x11, 0x11 } },
     { 'O', { 0x0E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E } },
     { 'P', { 0x1E, 0x11, 0x11, 0x1E, 0x10, 0x10, 0x10 } },
+    { 'Q', { 0x0E, 0x11, 0x11, 0x11, 0x15, 0x12, 0x0D } },
     { 'R', { 0x1E, 0x11, 0x11, 0x1E, 0x14, 0x12, 0x11 } },
     { 'S', { 0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E } },
     { 'T', { 0x1F, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04 } },
     { 'U', { 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E } },
-    { 'V', { 0x11, 0x11, 0x11, 0x11, 0x11, 0x0A, 0x04 } }
+    { 'V', { 0x11, 0x11, 0x11, 0x11, 0x11, 0x0A, 0x04 } },
+    { 'Z', { 0x1F, 0x01, 0x02, 0x04, 0x08, 0x10, 0x1F } }
 };
 
 // ============================================================================
@@ -300,7 +379,13 @@ void  ActualizarCarrera(Model& terreno);
 void  ActualizarAmbiente(float dt);
 float ObtenerAlturaTerreno(Model& terreno, float x, float z, float yActual);
 void  ConstruirLimitesPista(Model& terreno);
+void  ConstruirColisionadores(Model& modelo);
+bool  ResolverColisiones(const glm::vec2& dirPista);
 float Suavizar(float actual, float objetivo, float tasa, float dt);
+
+// ---- Ventisca ----
+void InicializarCopos();
+void ActualizarVentisca(float dt, float velNorm);
 
 // ---- Recursos gráficos ----
 GLuint CargarSkybox(const char* caras[6]);
@@ -362,7 +447,7 @@ int main()
     //  6.3 Carga de shaders
     // ------------------------------------------------------------------------
     Shader lightingShader("Shader/lighting.vs", "Shader/lighting.frag");  // Escena con Blinn-Phong y niebla
-    Shader colorShader("Shader/core.vs", "Shader/core.frag");             // Color plano (indicador y postes)
+    Shader colorShader("Shader/core.vs", "Shader/core.frag");             // Color plano (indicador, postes, colisionadores)
     Shader skyShader("Shader/skybox.vs", "Shader/skybox.frag");           // Cielo
     Shader hudShader("Shader/hud.vs", "Shader/hud.frag");                 // Interfaz 2D
 
@@ -370,7 +455,7 @@ int main()
     //  6.4 Configuración de geometría (VAO/VBO)
     // ------------------------------------------------------------------------
 
-    // 6.4.1 Cubo: indicador del esquiador y postes de límite
+    // 6.4.1 Cubo: indicador del esquiador, postes de límite y colisionadores
     GLuint VBO, VAO;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
@@ -422,6 +507,12 @@ int main()
     // Postes que delimitan lateralmente la pista
     ConstruirLimitesPista(PistaCompleta);
 
+    // Colisionadores de árboles y rocas (detección automática desde la malla)
+    ConstruirColisionadores(PistaCompleta);
+
+    // Copos de nieve para la ventisca
+    InicializarCopos();
+
     // ------------------------------------------------------------------------
     //  6.7 CICLO PRINCIPAL (GAME LOOP)
     // ------------------------------------------------------------------------
@@ -445,8 +536,9 @@ int main()
             reconstruirLimites = false;
         }
 
-        // Velocidad normalizada (0..1): modula FOV y vibración de cámara
+        // Velocidad normalizada (0..1): modula FOV, vibración de cámara y viento
         float velNorm = glm::clamp(velActual / ambienteActual.velocidadDescenso, 0.0f, 1.0f);
+        ActualizarVentisca(deltaTime, velNorm);
 
         // ---- 6.7.3 Limpieza de buffers ----
         glClearColor(ambienteActual.colorNiebla.r, ambienteActual.colorNiebla.g, ambienteActual.colorNiebla.b, 1.0f);
@@ -455,7 +547,7 @@ int main()
         // ---- 6.7.4 Matrices de vista y proyección ----
         glm::mat4 view;
         glm::vec3 currentViewPos = camera.GetPosition();
-        float fov = camera.GetZoom();
+        float fov = glm::radians(FOV_BASE_GRADOS);
 
         if (modoCamara == 0)
         {
@@ -486,6 +578,7 @@ int main()
             fov *= 1.0f + (ambienteActual.factorFov - 1.0f) * velNorm;
         }
 
+        fov = glm::clamp(fov, glm::radians(20.0f), glm::radians(FOV_MAXIMO_GRADOS));
         glm::mat4 projection = glm::perspective(fov, (GLfloat)SCREEN_WIDTH / (GLfloat)SCREEN_HEIGHT, 0.1f, 2000.0f);
 
         // ---- 6.7.5 Uniformes de iluminación y niebla ----
@@ -497,15 +590,16 @@ int main()
         glUniform3f(glGetUniformLocation(lightingShader.Program, "material.specular"), 0.6f, 0.6f, 0.6f);
         glUniform1f(glGetUniformLocation(lightingShader.Program, "material.shininess"), 32.0f);
 
-        // Niebla (nivel de dificultad + ajuste manual N/M)
-        float densidadNiebla = glm::clamp(ambienteActual.densidadNiebla + ajusteNieblaManual, 0.0f, 0.02f);
+        // Niebla (nivel de dificultad + ajuste manual N/M + ventisca)
+        float densidadNiebla = glm::clamp(ambienteActual.densidadNiebla + ajusteNieblaManual
+                                          + intensidadVentisca * NIEBLA_EXTRA_VENTISCA, 0.0f, 0.02f);
         glUniform1f(glGetUniformLocation(lightingShader.Program, "fogDensity"), densidadNiebla);
         glUniform3f(glGetUniformLocation(lightingShader.Program, "fogColor"),
                     ambienteActual.colorNiebla.r, ambienteActual.colorNiebla.g, ambienteActual.colorNiebla.b);
 
         // Luz direccional: sol de atardecer (baja, cálida, ambiente fría)
-        glm::vec3 solAmbiente = ambienteActual.colorAmbiente * (0.6f + 0.4f * ambienteActual.intensidadSol);
-        glm::vec3 solDifuso   = ambienteActual.colorSol * ambienteActual.intensidadSol;
+        glm::vec3 solAmbiente  = ambienteActual.colorAmbiente * (0.6f + 0.4f * ambienteActual.intensidadSol);
+        glm::vec3 solDifuso    = ambienteActual.colorSol * ambienteActual.intensidadSol;
         glm::vec3 solEspecular = ambienteActual.colorSol * 0.5f;
         glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.direction"), direccionSol.x, direccionSol.y, direccionSol.z);
         glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.ambient"),  solAmbiente.r, solAmbiente.g, solAmbiente.b);
@@ -557,43 +651,153 @@ int main()
         }//xcc prueba 
 
 
-        // ---- 6.7.7 Elementos de color plano: postes de límite y esquiador ----
+// ---- 6.7.7 Elementos de color plano: postes, colisionadores y esquiador ----
 
-        //xcc- elementos visibles solo en la pista
+//xcc- elementos visibles solo en la pista
         if (escenaActual == ESCENA_PISTA)
         {
-
             colorShader.Use();
-            glUniformMatrix4fv(glGetUniformLocation(colorShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
-            glUniformMatrix4fv(glGetUniformLocation(colorShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+            glUniformMatrix4fv(
+                glGetUniformLocation(colorShader.Program, "view"),
+                1, GL_FALSE, glm::value_ptr(view)
+            );
+
+            glUniformMatrix4fv(
+                glGetUniformLocation(colorShader.Program, "projection"),
+                1, GL_FALSE, glm::value_ptr(projection)
+            );
+
             GLint colorModelLoc = glGetUniformLocation(colorShader.Program, "model");
 
             glBindVertexArray(VAO);
 
-            // Postes de límite (alternan rojo / blanco, estilo puertas de slalom)
+            // Postes de límite
             for (size_t i = 0; i < postesLimite.size(); i++)
             {
-                glm::mat4 modelPoste = glm::translate(glm::mat4(1.0f), postesLimite[i] + glm::vec3(0.0f, ALTURA_POSTE * 0.5f, 0.0f));
-                modelPoste = glm::scale(modelPoste, glm::vec3(0.6f, ALTURA_POSTE, 0.6f));
-                glUniformMatrix4fv(colorModelLoc, 1, GL_FALSE, glm::value_ptr(modelPoste));
-                glm::vec3 colorPoste = ((i / 2) % 2 == 0) ? glm::vec3(0.85f, 0.10f, 0.10f) : glm::vec3(0.95f, 0.95f, 0.95f);
-                glUniform3fv(colorShader.uniformColor, 1, glm::value_ptr(colorPoste));
+                glm::mat4 modelPoste = glm::translate(
+                    glm::mat4(1.0f),
+                    postesLimite[i] + glm::vec3(
+                        0.0f,
+                        ALTURA_POSTE * 0.5f - DESFASE_POSTE,
+                        0.0f
+                    )
+                );
+
+                modelPoste = glm::scale(
+                    modelPoste,
+                    glm::vec3(0.6f, ALTURA_POSTE, 0.6f)
+                );
+
+                glUniformMatrix4fv(
+                    colorModelLoc,
+                    1,
+                    GL_FALSE,
+                    glm::value_ptr(modelPoste)
+                );
+
+                glm::vec3 colorPoste =
+                    ((i / 2) % 2 == 0)
+                    ? glm::vec3(0.85f, 0.10f, 0.10f)
+                    : glm::vec3(0.95f, 0.95f, 0.95f);
+
+                glUniform3fv(
+                    colorShader.uniformColor,
+                    1,
+                    glm::value_ptr(colorPoste)
+                );
+
                 glDrawArrays(GL_TRIANGLES, 0, 36);
             }
 
-            // Nodo raíz del esquiador (indicador naranja, hasta recibir el modelo final)
+            // Colisionadores de la pista
+            if (mostrarColisionadores)
+            {
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+                for (size_t i = 0; i < obstaculos.size(); i++)
+                {
+                    const Obstaculo& o = obstaculos[i];
+
+                    float alto = o.yMax - o.yMin;
+
+                    glm::mat4 modelCol = glm::translate(
+                        glm::mat4(1.0f),
+                        glm::vec3(
+                            o.centro.x,
+                            o.yMin + alto * 0.5f,
+                            o.centro.z
+                        )
+                    );
+
+                    modelCol = glm::scale(
+                        modelCol,
+                        glm::vec3(
+                            o.radio * 2.0f,
+                            alto,
+                            o.radio * 2.0f
+                        )
+                    );
+
+                    glUniformMatrix4fv(
+                        colorModelLoc,
+                        1,
+                        GL_FALSE,
+                        glm::value_ptr(modelCol)
+                    );
+
+                    glm::vec3 colorCol =
+                        o.esArbol
+                        ? glm::vec3(0.1f, 1.0f, 0.2f)
+                        : glm::vec3(1.0f, 0.2f, 1.0f);
+
+                    glUniform3fv(
+                        colorShader.uniformColor,
+                        1,
+                        glm::value_ptr(colorCol)
+                    );
+
+                    glDrawArrays(GL_TRIANGLES, 0, 36);
+                }
+
+                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+            }
+
+            // Nodo raíz temporal del esquiador
             glm::mat4 modelTemp = glm::mat4(1.0f);
             modelTemp = glm::translate(modelTemp, skierPos);
-            modelTemp = glm::rotate(modelTemp, glm::radians(skierRotY), glm::vec3(0.0f, 1.0f, 0.0f));
-            glm::mat4 modelIndicador = glm::scale(modelTemp, glm::vec3(1.5f, 3.0f, 1.5f));
-            glUniformMatrix4fv(colorModelLoc, 1, GL_FALSE, glm::value_ptr(modelIndicador));
+
+            modelTemp = glm::rotate(
+                modelTemp,
+                glm::radians(skierRotY),
+                glm::vec3(0.0f, 1.0f, 0.0f)
+            );
+
+            glm::mat4 modelIndicador = glm::scale(
+                modelTemp,
+                glm::vec3(1.5f, 3.0f, 1.5f)
+            );
+
+            glUniformMatrix4fv(
+                colorModelLoc,
+                1,
+                GL_FALSE,
+                glm::value_ptr(modelIndicador)
+            );
+
             glm::vec3 colorNaranja(1.0f, 0.35f, 0.0f);
-            glUniform3fv(colorShader.uniformColor, 1, glm::value_ptr(colorNaranja));
+
+            glUniform3fv(
+                colorShader.uniformColor,
+                1,
+                glm::value_ptr(colorNaranja)
+            );
+
             glDrawArrays(GL_TRIANGLES, 0, 36);
 
             glBindVertexArray(0);
-
         }
+
 
         //xcc- terreno amplio alrededor del Hub
         if (escenaActual == ESCENA_HUB)
@@ -601,11 +805,13 @@ int main()
             colorShader.Use();
 
             glUniformMatrix4fv(
-                glGetUniformLocation(colorShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view)
+                glGetUniformLocation(colorShader.Program, "view"),
+                1, GL_FALSE, glm::value_ptr(view)
             );
 
             glUniformMatrix4fv(
-                glGetUniformLocation(colorShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection)
+                glGetUniformLocation(colorShader.Program, "projection"),
+                1, GL_FALSE, glm::value_ptr(projection)
             );
 
             GLint colorModelLoc = glGetUniformLocation(colorShader.Program, "model");
@@ -614,9 +820,16 @@ int main()
 
             glm::mat4 sueloHub = glm::mat4(1.0f);
 
-            //xcc- nieve justo debajo del piso del Hub
-            sueloHub = glm::translate(sueloHub, glm::vec3(0.0f, -0.11f, 0.0f));
-            sueloHub = glm::scale(sueloHub, glm::vec3(500.0f, 0.10f, 500.0f));
+            //xcc- nieve debajo del Hub
+            sueloHub = glm::translate(
+                sueloHub,
+                glm::vec3(0.0f, -0.11f, 0.0f)
+            );
+
+            sueloHub = glm::scale(
+                sueloHub,
+                glm::vec3(500.0f, 0.10f, 500.0f)
+            );
 
             glUniformMatrix4fv(
                 colorModelLoc,
@@ -625,15 +838,18 @@ int main()
                 glm::value_ptr(sueloHub)
             );
 
-            //xcc- color de nieve
             glm::vec3 colorNieve(0.90f, 0.94f, 1.0f);
-            glUniform3fv( colorShader.uniformColor, 1, glm::value_ptr(colorNieve));
+
+            glUniform3fv(
+                colorShader.uniformColor,
+                1,
+                glm::value_ptr(colorNieve)
+            );
 
             glDrawArrays(GL_TRIANGLES, 0, 36);
 
             glBindVertexArray(0);
         }
-
 
         // ---- 6.7.8 Skybox (se dibuja al final con prueba de profundidad LEQUAL) ----
         glDepthFunc(GL_LEQUAL);
@@ -662,10 +878,7 @@ int main()
         glBindVertexArray(0);
         glDepthFunc(GL_LESS);
 
-        // ---- 6.7.9 Interfaz 2D (HUD) ----
-     /*   DibujarHUD(hudShader);*/
-
-
+        // ---- 6.7.9 Interfaz 2D (ventisca + HUD) ----
 
         //xcc- muestra el HUD correspondiente a cada escena
         if (escenaActual == ESCENA_HUB)
@@ -759,7 +972,7 @@ GLuint CargarSkybox(const char* caras[6])
 }
 
 // ----------------------------------------------------------------------------
-//  7.3 Colisión con el terreno y límites de pista
+//  7.3 Colisión con el terreno, límites de pista y obstáculos
 // ----------------------------------------------------------------------------
 
 /**
@@ -828,8 +1041,8 @@ float ObtenerAlturaTerreno(Model& terreno, float x, float z, float yActual)
 /**
  * @brief Genera los postes que delimitan lateralmente la pista, a ambos
  *        lados del eje Salida-Meta, apoyados sobre la malla del terreno.
- *        Se ejecuta una sola vez (y al reubicar salida/meta) porque
- *        ObtenerAlturaTerreno recorre toda la malla.
+ *        Se recorre la pista en pasos y la altura hallada en cada paso es la
+ *        referencia del siguiente (mismo principio que el esquiador).
  * @param terreno Modelo de la pista.
  */
 void ConstruirLimitesPista(Model& terreno)
@@ -843,21 +1056,203 @@ void ConstruirLimitesPista(Model& terreno)
 
     glm::vec2 dirPista = glm::normalize(vecTotalXZ);
     glm::vec2 dirDerecha(dirPista.y, -dirPista.x);
-    int cantidad = (int)(distTotalXZ / SEPARACION_POSTES);
+    glm::vec2 origen(posSalida.x, posSalida.z);
 
-    for (int i = 0; i <= cantidad; i++)
+    // Altura de referencia por lado: se actualiza en cada muestra
+    float yRef[2] = { posSalida.y, posSalida.y };
+    float proximoPoste = 0.0f;
+
+    for (float d = 0.0f; d <= distTotalXZ; d += PASO_MUESTREO_ALTURA)
     {
-        float t = (float)i / (float)(cantidad > 0 ? cantidad : 1);
-        glm::vec2 centro = glm::vec2(posSalida.x, posSalida.z) + dirPista * (t * distTotalXZ);
-        float yLinea = glm::mix(posSalida.y, posMeta.y, t);
-
-        for (int lado = -1; lado <= 1; lado += 2)
+        for (int lado = 0; lado < 2; lado++)
         {
-            glm::vec2 p = centro + dirDerecha * (ANCHO_MEDIO_PISTA * (float)lado);
-            float y = ObtenerAlturaTerreno(terreno, p.x, p.y, yLinea);
-            postesLimite.push_back(glm::vec3(p.x, y, p.y));
+            float signo = (lado == 0) ? -1.0f : 1.0f;
+            glm::vec2 p = origen + dirPista * d + dirDerecha * (ANCHO_MEDIO_PISTA * signo);
+            yRef[lado] = ObtenerAlturaTerreno(terreno, p.x, p.y, yRef[lado]);
+
+            if (d >= proximoPoste)
+                postesLimite.push_back(glm::vec3(p.x, yRef[lado], p.y));
+        }
+        if (d >= proximoPoste)
+            proximoPoste += SEPARACION_POSTES;
+    }
+}
+
+/**
+ * @brief Busca la raíz de un conjunto (estructura unión-búsqueda con
+ *        compresión de caminos).
+ */
+static int BuscarRaiz(std::vector<int>& padre, int a)
+{
+    while (padre[a] != a)
+    {
+        padre[a] = padre[padre[a]];
+        a = padre[a];
+    }
+    return a;
+}
+
+/** @brief Une los conjuntos que contienen a los elementos a y b. */
+static void UnirConjuntos(std::vector<int>& padre, int a, int b)
+{
+    int ra = BuscarRaiz(padre, a);
+    int rb = BuscarRaiz(padre, b);
+    if (ra != rb)
+        padre[rb] = ra;
+}
+
+/**
+ * @brief Detecta automáticamente árboles y rocas dentro del modelo de la
+ *        pista y los convierte en colisionadores cilíndricos.
+ *
+ *        Procedimiento:
+ *          1. Se sueldan los vértices duplicados por posición.
+ *          2. Se agrupan los triángulos conectados (cada objeto aislado
+ *             forma una componente).
+ *          3. De cada componente se obtiene su caja envolvente. Las
+ *             componentes de tamaño razonable (ni terreno, ni carteles)
+ *             se consideran obstáculos.
+ *          4. Si el objeto es más alto que ancho se trata como árbol (el
+ *             colisionador es el tronco); en caso contrario, como roca.
+ *
+ *        Los umbrales se ajustan con las constantes de la Etapa 2 y se
+ *        verifican visualmente con la tecla F3.
+ * @param modelo Modelo que contiene la pista y su vegetación.
+ */
+void ConstruirColisionadores(Model& modelo)
+{
+    obstaculos.clear();
+    int arboles = 0, rocas = 0;
+
+    for (size_t m = 0; m < modelo.meshes.size(); m++)
+    {
+        const std::vector<Vertex>& verts = modelo.meshes[m].vertices;
+        const std::vector<GLuint>& inds = modelo.meshes[m].indices;
+        if (verts.empty())
+            continue;
+
+        // 1. Soldadura de vértices por posición (cuadrícula de 0.02 unidades)
+        std::unordered_map<unsigned long long, int> soldadura;
+        std::vector<int> idSoldado(verts.size());
+        int cantidad = 0;
+
+        for (size_t v = 0; v < verts.size(); v++)
+        {
+            long long ix = (long long)std::floor(verts[v].Position.x / 0.02f);
+            long long iy = (long long)std::floor(verts[v].Position.y / 0.02f);
+            long long iz = (long long)std::floor(verts[v].Position.z / 0.02f);
+            unsigned long long clave = ((unsigned long long)(ix & 0x1FFFFFLL) << 42)
+                                     | ((unsigned long long)(iy & 0x1FFFFFLL) << 21)
+                                     |  (unsigned long long)(iz & 0x1FFFFFLL);
+
+            std::unordered_map<unsigned long long, int>::iterator it = soldadura.find(clave);
+            if (it == soldadura.end())
+            {
+                soldadura[clave] = cantidad;
+                idSoldado[v] = cantidad;
+                cantidad++;
+            }
+            else
+            {
+                idSoldado[v] = it->second;
+            }
+        }
+
+        // 2. Componentes conexas
+        std::vector<int> padre(cantidad);
+        for (int i = 0; i < cantidad; i++)
+            padre[i] = i;
+
+        for (size_t i = 0; i + 2 < inds.size(); i += 3)
+        {
+            UnirConjuntos(padre, idSoldado[inds[i]], idSoldado[inds[i + 1]]);
+            UnirConjuntos(padre, idSoldado[inds[i + 1]], idSoldado[inds[i + 2]]);
+        }
+
+        // 3. Caja envolvente por componente
+        std::vector<glm::vec3> minimo(cantidad, glm::vec3(1e9f));
+        std::vector<glm::vec3> maximo(cantidad, glm::vec3(-1e9f));
+        for (size_t v = 0; v < verts.size(); v++)
+        {
+            int r = BuscarRaiz(padre, idSoldado[v]);
+            minimo[r] = glm::min(minimo[r], verts[v].Position);
+            maximo[r] = glm::max(maximo[r], verts[v].Position);
+        }
+
+        // 4. Filtrado y clasificación
+        for (int r = 0; r < cantidad; r++)
+        {
+            if (padre[r] != r)
+                continue;   // Solo raíces
+
+            glm::vec3 tam = maximo[r] - minimo[r];
+            float ancho = glm::max(tam.x, tam.z);
+            float alto = tam.y;
+
+            if (ancho > MAX_ANCHO_OBSTACULO || ancho < MIN_ANCHO_OBSTACULO || alto < MIN_ALTO_OBSTACULO)
+                continue;
+
+            Obstaculo o;
+            o.centro = glm::vec3((minimo[r].x + maximo[r].x) * 0.5f, 0.0f, (minimo[r].z + maximo[r].z) * 0.5f);
+            o.yMin = minimo[r].y;
+            o.yMax = maximo[r].y;
+            o.esArbol = (alto > ancho * 1.2f);
+            o.radio = glm::max(RADIO_MINIMO_OBSTACULO, ancho * (o.esArbol ? FACTOR_RADIO_ARBOL : FACTOR_RADIO_ROCA));
+            obstaculos.push_back(o);
+
+            if (o.esArbol) arboles++; else rocas++;
         }
     }
+
+    std::cout << "[Colisiones] Obstaculos detectados: " << obstaculos.size()
+              << " (" << arboles << " arboles, " << rocas << " rocas). F3 para visualizarlos." << std::endl;
+}
+
+/**
+ * @brief Resuelve las colisiones del esquiador con árboles y rocas. Si el
+ *        esquiador penetra un colisionador se le empuja hacia afuera
+ *        (deslizamiento alrededor del obstáculo).
+ *        Se ignoran los obstáculos cercanos a salida y meta (carteles).
+ * @param dirPista Dirección de la pista en XZ (para el caso degenerado).
+ * @return true si hubo contacto con algún obstáculo en este cuadro.
+ */
+bool ResolverColisiones(const glm::vec2& dirPista)
+{
+    bool hubo = false;
+    glm::vec2 salidaXZ(posSalida.x, posSalida.z);
+    glm::vec2 metaXZ(posMeta.x, posMeta.z);
+    float yPies = skierPos.y - offsetPiesEsquiador;
+    float yCabeza = skierPos.y + offsetPiesEsquiador;
+
+    for (size_t i = 0; i < obstaculos.size(); i++)
+    {
+        const Obstaculo& o = obstaculos[i];
+        glm::vec2 c(o.centro.x, o.centro.z);
+
+        // Zonas de salida y meta libres
+        if (glm::distance(c, salidaXZ) < ZONA_LIBRE_SALIDA_META || glm::distance(c, metaXZ) < ZONA_LIBRE_SALIDA_META)
+            continue;
+
+        // Rango vertical
+        if (yCabeza < o.yMin - 1.0f || yPies > o.yMax)
+            continue;
+
+        float dx = skierPos.x - c.x;
+        float dz = skierPos.z - c.y;
+        float distMinima = o.radio + RADIO_ESQUIADOR;
+        float d2 = dx * dx + dz * dz;
+
+        if (d2 < distMinima * distMinima)
+        {
+            float d = std::sqrt(d2);
+            glm::vec2 normal = (d > 0.0001f) ? glm::vec2(dx / d, dz / d) : -dirPista;
+            skierPos.x = c.x + normal.x * distMinima;
+            skierPos.z = c.y + normal.y * distMinima;
+            hubo = true;
+        }
+    }
+
+    return hubo;
 }
 
 // ----------------------------------------------------------------------------
@@ -881,15 +1276,18 @@ void ActualizarAmbiente(float dt)
     ambienteActual.intensidadSol     += (obj.intensidadSol     - ambienteActual.intensidadSol)     * k;
     ambienteActual.factorFov         += (obj.factorFov         - ambienteActual.factorFov)         * k;
     ambienteActual.amplitudVibracion += (obj.amplitudVibracion - ambienteActual.amplitudVibracion) * k;
-    ambienteActual.colorNiebla  = glm::mix(ambienteActual.colorNiebla,  obj.colorNiebla,  k);
-    ambienteActual.colorSol     = glm::mix(ambienteActual.colorSol,     obj.colorSol,     k);
+    ambienteActual.colorNiebla   = glm::mix(ambienteActual.colorNiebla,   obj.colorNiebla,   k);
+    ambienteActual.colorSol      = glm::mix(ambienteActual.colorSol,      obj.colorSol,      k);
     ambienteActual.colorAmbiente = glm::mix(ambienteActual.colorAmbiente, obj.colorAmbiente, k);
 }
 
 /**
- * @brief Actualiza la carrera: avance siguiendo el eje Salida-Meta,
- *        desplazamiento lateral, límites de pista, altura sobre la malla,
- *        cronómetro y detección de meta.
+ * @brief Actualiza la carrera:
+ *          - Control manual: avance (W / flecha arriba), freno (S / flecha
+ *            abajo) y giro lateral (A/D / flechas laterales).
+ *          - Colisiones con obstáculos y límites laterales de pista.
+ *          - Ajuste de altura sobre la malla del terreno.
+ *          - Cronómetro y detección de META (solo al cruzar la línea).
  * @param terreno Modelo de la pista (para ajustar la altura del esquiador).
  */
 void ActualizarCarrera(Model& terreno)
@@ -909,35 +1307,59 @@ void ActualizarCarrera(Model& terreno)
     glm::vec2 dirDerecha(dirPista.y, -dirPista.x);
     float anguloBase = glm::degrees(atan2(dirPista.x, dirPista.y));
 
-    // Aceleración progresiva hacia la velocidad del nivel actual
-    velActual = Suavizar(velActual, ambienteActual.velocidadDescenso, 1.2f, deltaTime);
+    // ---- Entrada: en la cámara de inspección las teclas mueven la cámara ----
+    bool avanzar = (keys[GLFW_KEY_W] || keys[GLFW_KEY_UP]) && modoCamara == 1;
+    bool frenar  = (keys[GLFW_KEY_S] || keys[GLFW_KEY_DOWN]) && modoCamara == 1;
 
-    // Avance en XZ
+    // ---- Velocidad: acelera al avanzar, frena o se detiene por fricción ----
+    float objetivo = 0.0f;
+    float tasa = FRICCION_LIBRE;
+    if (frenar)
+    {
+        tasa = FRENADO;
+    }
+    else if (avanzar)
+    {
+        objetivo = ambienteActual.velocidadDescenso;
+        tasa = ACELERACION_AVANCE;
+    }
+    velActual = Suavizar(velActual, objetivo, tasa, deltaTime);
+    if (velActual < 0.05f && objetivo == 0.0f)
+        velActual = 0.0f;
+
+    // ---- Avance en XZ sobre el eje de la pista ----
     skierPos.x += dirPista.x * velActual * deltaTime;
     skierPos.z += dirPista.y * velActual * deltaTime;
 
-    // Slalom lateral (A/D o flechas)
+    // ---- Slalom lateral (A/D o flechas) ----
     if (modoCamara == 1)
     {
+        float anguloObjetivo = anguloBase;
+
         if (keys[GLFW_KEY_A] || keys[GLFW_KEY_LEFT])
         {
             skierPos.x -= dirDerecha.x * ambienteActual.velocidadLateral * deltaTime;
             skierPos.z -= dirDerecha.y * ambienteActual.velocidadLateral * deltaTime;
-            skierRotY = anguloBase + 18.0f;
+            anguloObjetivo = anguloBase - ANGULO_GIRO_ESQUIADOR;
         }
         else if (keys[GLFW_KEY_D] || keys[GLFW_KEY_RIGHT])
         {
             skierPos.x += dirDerecha.x * ambienteActual.velocidadLateral * deltaTime;
             skierPos.z += dirDerecha.y * ambienteActual.velocidadLateral * deltaTime;
-            skierRotY = anguloBase - 18.0f;
+            anguloObjetivo = anguloBase + ANGULO_GIRO_ESQUIADOR;
         }
-        else
-        {
-            skierRotY = anguloBase;
-        }
+
+        skierRotY = Suavizar(skierRotY, anguloObjetivo, 10.0f, deltaTime);
     }
 
-    // Límites laterales: se proyecta la posición sobre el eje lateral de la pista
+    // ---- Colisiones con árboles y rocas ----
+    if (ResolverColisiones(dirPista))
+    {
+        velActual = glm::min(velActual, ambienteActual.velocidadDescenso * FACTOR_VEL_CHOQUE);
+        tiempoAvisoChoque = ahora;
+    }
+
+    // ---- Límites laterales: se proyecta la posición sobre el eje lateral ----
     glm::vec2 relativo(skierPos.x - posSalida.x, skierPos.z - posSalida.z);
     float lateral = glm::dot(relativo, dirDerecha);
     if (std::abs(lateral) > ANCHO_MEDIO_PISTA)
@@ -949,15 +1371,21 @@ void ActualizarCarrera(Model& terreno)
         tiempoAvisoLimite = ahora;
     }
 
-    // Altura exacta leyendo el triángulo de la malla bajo el esquiador
+    // ---- No retroceder más allá de la línea de salida ----
+    float avance = glm::dot(glm::vec2(skierPos.x - posSalida.x, skierPos.z - posSalida.z), dirPista);
+    if (avance < 0.0f)
+    {
+        skierPos.x -= dirPista.x * avance;
+        skierPos.z -= dirPista.y * avance;
+        avance = 0.0f;
+    }
+
+    // ---- Altura exacta leyendo el triángulo de la malla bajo el esquiador ----
     float ySuelo = ObtenerAlturaTerreno(terreno, skierPos.x, skierPos.z, skierPos.y - offsetPiesEsquiador);
     skierPos.y = ySuelo + offsetPiesEsquiador;
 
-    // Verificación de llegada a la META
-    glm::vec2 vecActualXZ(skierPos.x - posSalida.x, skierPos.z - posSalida.z);
-    float progreso = glm::dot(vecActualXZ, dirPista) / distTotalXZ;
-
-    if (progreso >= 0.99f || glm::distance(glm::vec2(skierPos.x, skierPos.z), glm::vec2(posMeta.x, posMeta.z)) < 6.0f)
+    // ---- META: solo se gana al cruzar la línea (plano perpendicular a la pista en posMeta) ----
+    if (avance >= distTotalXZ)
     {
         estadoCarrera = 2;
         tiempoFinalCarrera = tiempoActualCarrera;
@@ -968,7 +1396,58 @@ void ActualizarCarrera(Model& terreno)
 }
 
 // ----------------------------------------------------------------------------
-//  7.5 Interfaz 2D (HUD)
+//  7.5 Ventisca
+// ----------------------------------------------------------------------------
+
+/**
+ * @brief Distribuye los copos de nieve de forma aleatoria en pantalla.
+ */
+void InicializarCopos()
+{
+    std::srand(12345);
+    copos.resize(MAX_COPOS);
+    for (size_t i = 0; i < copos.size(); i++)
+    {
+        copos[i].u = (float)(std::rand() % 1000) / 1000.0f;
+        copos[i].v = (float)(std::rand() % 1000) / 1000.0f;
+        copos[i].z = (float)(std::rand() % 1000) / 1000.0f;
+        copos[i].fase = (float)(std::rand() % 6283) / 1000.0f;
+    }
+}
+
+/**
+ * @brief Actualiza la intensidad de la ventisca y el movimiento de los copos.
+ *        El viento crece con las ráfagas y con la velocidad del esquiador.
+ * @param dt      Tiempo transcurrido desde el cuadro anterior (s).
+ * @param velNorm Velocidad normalizada del esquiador [0, 1].
+ */
+void ActualizarVentisca(float dt, float velNorm)
+{
+    intensidadVentisca = Suavizar(intensidadVentisca, ventiscaActiva ? 1.0f : 0.0f, 1.5f, dt);
+    if (intensidadVentisca < 0.01f)
+        return;
+
+    float t = (float)glfwGetTime();
+    float rafaga = 0.5f + 0.5f * std::sin(t * 0.7f) * std::sin(t * 0.31f + 1.0f);   // [0, 1]
+    vientoVentisca = 0.20f + 0.25f * rafaga + 0.30f * velNorm;
+
+    for (size_t i = 0; i < copos.size(); i++)
+    {
+        Copo& c = copos[i];
+        float paralaje = 0.4f + 0.9f * c.z;                 // Los cercanos se mueven más rápido
+
+        c.u -= vientoVentisca * paralaje * dt;
+        c.v += (0.10f + 0.10f * c.z) * dt + 0.03f * std::sin(t * 2.0f + c.fase) * dt;
+
+        if (c.u < 0.0f) c.u += 1.0f;
+        if (c.u >= 1.0f) c.u -= 1.0f;
+        if (c.v >= 1.0f) c.v -= 1.0f;
+        if (c.v < 0.0f) c.v += 1.0f;
+    }
+}
+
+// ----------------------------------------------------------------------------
+//  7.6 Interfaz 2D (HUD)
 // ----------------------------------------------------------------------------
 
 /**
@@ -1005,6 +1484,23 @@ static const unsigned char* ObtenerGlifo(char c)
 static void AnadirRect(std::vector<GLfloat>& b, float x, float y, float w, float h)
 {
     GLfloat v[12] = { x, y,  x + w, y,  x + w, y + h,  x + w, y + h,  x, y + h,  x, y };
+    b.insert(b.end(), v, v + 12);
+}
+
+/**
+ * @brief Agrega un copo con estela (paralelogramo inclinado). La cabeza está
+ *        en (x, y) y la estela se extiende hacia arriba a la derecha, pues el
+ *        copo viaja hacia abajo a la izquierda.
+ */
+static void AnadirCopo(std::vector<GLfloat>& b, float x, float y, float largo, float alto)
+{
+    float dy = -largo * 0.35f;
+    GLfloat v[12] = { x, y,
+                      x + largo, y + dy,
+                      x + largo, y + dy + alto,
+                      x + largo, y + dy + alto,
+                      x, y + alto,
+                      x, y };
     b.insert(b.end(), v, v + 12);
 }
 
@@ -1062,9 +1558,51 @@ static void DibujarTexto(Shader& hud, const std::string& texto, float x, float y
 }
 
 /**
- * @brief Dibuja toda la interfaz: nivel, cronómetro, avisos de salida, meta,
- *        límite de pista e indicaciones. Se renderiza sobre la escena sin
- *        prueba de profundidad.
+ * @brief Dibuja la ventisca sobre la pantalla: un velo blanquecino y tres
+ *        capas de copos (lejanos, medios y cercanos) con estela proporcional
+ *        a la velocidad del viento.
+ * @param hud Shader del HUD (ya activo y con la proyección ortográfica).
+ */
+static void DibujarVentisca(Shader& hud)
+{
+    if (intensidadVentisca < 0.01f)
+        return;
+
+    float e = SCREEN_HEIGHT / 800.0f;
+    std::vector<GLfloat> b;
+
+    // Velo blanquecino que reduce el contraste
+    AnadirRect(b, 0.0f, 0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT);
+    EnviarBufferHud(hud, b, glm::vec4(0.92f, 0.95f, 1.0f, 0.10f * intensidadVentisca));
+
+    // Cantidad de copos visibles según la intensidad
+    int activos = (int)(copos.size() * intensidadVentisca);
+
+    // Tres capas de profundidad
+    for (int capa = 0; capa < 3; capa++)
+    {
+        b.clear();
+        float zMin = capa / 3.0f;
+        float zMax = (capa + 1) / 3.0f;
+        float tam = (1.5f + 2.0f * capa) * e;
+        float largo = tam * (2.0f + vientoVentisca * 12.0f);
+
+        for (int i = 0; i < activos; i++)
+        {
+            const Copo& c = copos[i];
+            if (c.z < zMin || c.z >= zMax)
+                continue;
+            AnadirCopo(b, c.u * SCREEN_WIDTH, c.v * SCREEN_HEIGHT, largo, tam);
+        }
+
+        EnviarBufferHud(hud, b, glm::vec4(1.0f, 1.0f, 1.0f, 0.35f + 0.25f * capa));
+    }
+}
+
+/**
+ * @brief Dibuja toda la interfaz: ventisca, nivel, cronómetro, avisos de
+ *        salida, meta, límite, choque e indicaciones. Se renderiza sobre la
+ *        escena sin prueba de profundidad.
  * @param hudShader Shader del HUD.
  */
 
@@ -1101,6 +1639,9 @@ void DibujarHUD(Shader& hudShader)
     double ahora = glfwGetTime();
     char buf[64];
 
+    // Ventisca (debajo del texto)
+    DibujarVentisca(hudShader);
+
     // Nivel actual (esquina superior izquierda)
     DibujarTexto(hudShader, NOMBRES_NIVEL[nivelActual], 20.0f * e, 20.0f * e, 3.0f * e, glm::vec4(1.0f, 0.95f, 0.85f, 0.9f), false);
 
@@ -1111,12 +1652,18 @@ void DibujarHUD(Shader& hudShader)
         DibujarTexto(hudShader, buf, 0.0f, 20.0f * e, 4.0f * e, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), true);
     }
 
-    // Indicación en la salida
+    // Indicaciones en la salida
     if (estadoCarrera == 0)
     {
         float pulso = 0.65f + 0.35f * (float)std::sin(ahora * 3.0);
         DibujarTexto(hudShader, "PRESIONA R PARA INICIAR", 0.0f, SCREEN_HEIGHT - 70.0f * e, 3.5f * e, glm::vec4(1.0f, 1.0f, 1.0f, pulso), true);
+        DibujarTexto(hudShader, "1 2 3 - NIVEL    V - VENTISCA", 0.0f, SCREEN_HEIGHT - 120.0f * e, 3.0f * e, glm::vec4(1.0f, 0.95f, 0.85f, 0.85f), true);
     }
+
+    // Ayuda de controles al iniciar la carrera
+    float aAyuda = AlphaMensaje(tiempoAyudaControles, 3.0f, 1.5f);
+    if (aAyuda > 0.0f)
+        DibujarTexto(hudShader, "ARRIBA AVANZA - ABAJO FRENA", 0.0f, SCREEN_HEIGHT * 0.82f, 3.5f * e, glm::vec4(1.0f, 1.0f, 1.0f, aAyuda), true);
 
     // Mensaje de SALIDA
     float aSalida = AlphaMensaje(tiempoMensajeSalida, 0.8f, TIEMPO_MENSAJE_CORTO);
@@ -1127,6 +1674,21 @@ void DibujarHUD(Shader& hudShader)
     float aNivel = AlphaMensaje(tiempoMensajeNivel, 0.8f, TIEMPO_MENSAJE_CORTO);
     if (aNivel > 0.0f)
         DibujarTexto(hudShader, NOMBRES_NIVEL[nivelActual], 0.0f, SCREEN_HEIGHT * 0.42f, 6.0f * e, glm::vec4(1.0f, 0.75f, 0.35f, aNivel), true);
+
+    // Mensaje de ventisca
+    float aVentisca = AlphaMensaje(tiempoMensajeVentisca, 0.8f, TIEMPO_MENSAJE_CORTO);
+    if (aVentisca > 0.0f)
+        DibujarTexto(hudShader, ventiscaActiva ? "VENTISCA ACTIVADA" : "VENTISCA DESACTIVADA", 0.0f, SCREEN_HEIGHT * 0.54f, 5.0f * e, glm::vec4(0.8f, 0.9f, 1.0f, aVentisca), true);
+
+    // Aviso de nivel bloqueado (al intentar cambiarlo durante la carrera)
+    float aBloqueo = AlphaMensaje(tiempoAvisoNivel, 0.8f, 0.8f);
+    if (aBloqueo > 0.0f)
+        DibujarTexto(hudShader, "NIVEL SOLO EN SALIDA", 0.0f, SCREEN_HEIGHT * 0.68f, 4.0f * e, glm::vec4(1.0f, 0.5f, 0.2f, aBloqueo), true);
+
+    // Aviso de choque con un obstáculo
+    float aChoque = AlphaMensaje(tiempoAvisoChoque, 0.1f, 0.7f);
+    if (aChoque > 0.0f && estadoCarrera == 1)
+        DibujarTexto(hudShader, "CHOQUE!", 0.0f, SCREEN_HEIGHT * 0.62f, 5.0f * e, glm::vec4(1.0f, 0.55f, 0.1f, aChoque), true);
 
     // Aviso de límite de pista
     float aLimite = AlphaMensaje(tiempoAvisoLimite, 0.1f, 0.6f);
@@ -1147,7 +1709,7 @@ void DibujarHUD(Shader& hudShader)
 }
 
 // ----------------------------------------------------------------------------
-//  7.6 Entrada: teclado y mouse
+//  7.7 Entrada: teclado y mouse
 // ----------------------------------------------------------------------------
 
 /**
@@ -1251,8 +1813,8 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
     if (key == GLFW_KEY_P && action == GLFW_PRESS)
     {
         std::cout << "Coordenada actual -> glm::vec3(" << camera.GetPosition().x
-                  << "f, " << camera.GetPosition().y
-                  << "f, " << camera.GetPosition().z << "f);" << std::endl;
+            << "f, " << camera.GetPosition().y
+            << "f, " << camera.GetPosition().z << "f);" << std::endl;
     }
 
     if (key == GLFW_KEY_F1 && action == GLFW_PRESS)
@@ -1270,8 +1832,23 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         std::cout << ">>> [F2] Punto de META actualizado." << std::endl;
     }
 
+    // Visualización de colisionadores (depuración)
+    if (key == GLFW_KEY_F3 && action == GLFW_PRESS)
+    {
+        mostrarColisionadores = !mostrarColisionadores;
+        std::cout << "Colisionadores: " << (mostrarColisionadores ? "visibles" : "ocultos") << std::endl;
+    }
+
+    // Ventisca
+    if (key == GLFW_KEY_V && action == GLFW_PRESS)
+    {
+        ventiscaActiva = !ventiscaActiva;
+        tiempoMensajeVentisca = glfwGetTime();
+        std::cout << "Ventisca: " << (ventiscaActiva ? "activada" : "desactivada") << std::endl;
+    }
+
     // Inicio de carrera
-    
+
     //xcc- inicia la carrera solo desde la pista
     if (key == GLFW_KEY_R && action == GLFW_PRESS && escenaActual == ESCENA_PISTA)
 
@@ -1283,6 +1860,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         velActual = 0.0f;
         tiempoInicioCarrera = glfwGetTime();
         tiempoMensajeSalida = glfwGetTime();
+        tiempoAyudaControles = glfwGetTime();
         tiempoMensajeMeta = -1.0;
         std::cout << ">>> INICIA EL DESCENSO DE SLALOM" << std::endl;
     }
@@ -1299,34 +1877,42 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
     }
 
     // Niveles de dificultad y clima (la transición se interpola en ActualizarAmbiente)
-    //xcc- selecciona dificultad y clima desde el Hub
-    if (action == GLFW_PRESS && key >= GLFW_KEY_1 && key <= GLFW_KEY_3 && escenaActual == ESCENA_HUB)
+   //xcc- selecciona dificultad y clima desde el Hub
+    if (action == GLFW_PRESS && key >= GLFW_KEY_1 && key <= GLFW_KEY_3)
     {
-        nivelActual = key - GLFW_KEY_1;
-        ajusteNieblaManual = 0.0f;
+        if (escenaActual == ESCENA_HUB)
+        {
+            nivelActual = key - GLFW_KEY_1;
+            ajusteNieblaManual = 0.0f;
 
-        std::cout << "Seleccion en Hub: " << NOMBRES_NIVEL[nivelActual] << std::endl;
+            std::cout << "Seleccion en Hub: " << NOMBRES_NIVEL[nivelActual] << std::endl;
+        }
+        else if (escenaActual == ESCENA_PISTA)
+        {
+            //xcc- evita cambiar la dificultad desde la pista
+            tiempoAvisoNivel = glfwGetTime();
+        }
     }
 }
 
 /**
  * @brief Callback de mouse: orienta la cámara de inspección.
  */
-void MouseCallback(GLFWwindow* window, double xPos, double yPos)
-{
-    if (firstMouse)
+    void MouseCallback(GLFWwindow* window, double xPos, double yPos)
     {
+        if (firstMouse)
+        {
+            lastX = (GLfloat)xPos;
+            lastY = (GLfloat)yPos;
+            firstMouse = false;
+        }
+
+        GLfloat xOffset = (GLfloat)xPos - lastX;
+        GLfloat yOffset = lastY - (GLfloat)yPos;
+
         lastX = (GLfloat)xPos;
         lastY = (GLfloat)yPos;
-        firstMouse = false;
+
+        if (modoCamara == 0)
+            camera.ProcessMouseMovement(xOffset, yOffset);
     }
-
-    GLfloat xOffset = (GLfloat)xPos - lastX;
-    GLfloat yOffset = lastY - (GLfloat)yPos;
-
-    lastX = (GLfloat)xPos;
-    lastY = (GLfloat)yPos;
-
-    if (modoCamara == 0)
-        camera.ProcessMouseMovement(xOffset, yOffset);
-}
