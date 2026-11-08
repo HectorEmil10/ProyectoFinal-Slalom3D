@@ -33,9 +33,10 @@
     <None Include="Shader\lighting.vs" />
     <None Include="Shader\modelLoading.frag" />
     <None Include="Shader\modelLoading.vs" />
+    <None Include="Shader\skybox.frag" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ProyectoFinal.cpp" />
+    <ClCompile Include="slalom_main.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
