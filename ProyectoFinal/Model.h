@@ -22,6 +22,7 @@ using namespace std;
 
 GLint TextureFromFile(const char *path, string directory);
 
+GLuint TextureDeUnColor(float r, float g, float b);
 
 class Model
 {
@@ -210,22 +211,36 @@ public:
 
 GLint TextureFromFile(const char *path, string directory)
 {
-	//Generate texture ID and load texture data
+	// Conservar solo el nombre del archivo (Blender puede escribir rutas absolutas)
 	string filename = string(path);
+	size_t pos = filename.find_last_of("/\\");
+	if (pos != string::npos)
+		filename = filename.substr(pos + 1);
 	filename = directory + '/' + filename;
+
 	GLuint textureID;
 	glGenTextures(1, &textureID);
+	glBindTexture(GL_TEXTURE_2D, textureID);
 
 	int width, height;
-
 	unsigned char *image = SOIL_load_image(filename.c_str(), &width, &height, 0, SOIL_LOAD_RGB);
 
-	// Assign texture to ID
-	glBindTexture(GL_TEXTURE_2D, textureID);
+	if (!image)
+	{
+		cout << "ERROR::TEXTURA:: no se pudo cargar: " << filename << endl;
+		unsigned char magenta[3] = { 255, 0, 255 };   // Fallo visible
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, magenta);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		return textureID;
+	}
+
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);   // Anchos no múltiplo de 4
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
 	glGenerateMipmap(GL_TEXTURE_2D);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 
-	// Parameters
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -234,4 +249,20 @@ GLint TextureFromFile(const char *path, string directory)
 	SOIL_free_image_data(image);
 
 	return textureID;
+}
+
+// Textura de 1x1 con un color sólido (materiales de Blender sin imagen)
+GLuint TextureDeUnColor(float r, float g, float b)
+{
+	unsigned char px[3] = { (unsigned char)(r * 255), (unsigned char)(g * 255), (unsigned char)(b * 255) };
+	GLuint id;
+	glGenTextures(1, &id);
+	glBindTexture(GL_TEXTURE_2D, id);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, px);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	return id;
 }
