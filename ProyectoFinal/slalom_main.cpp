@@ -598,13 +598,11 @@ int main()
             colorShader.Use();
 
             glUniformMatrix4fv(
-                glGetUniformLocation(colorShader.Program, "view"),
-                1, GL_FALSE, glm::value_ptr(view)
+                glGetUniformLocation(colorShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view)
             );
 
             glUniformMatrix4fv(
-                glGetUniformLocation(colorShader.Program, "projection"),
-                1, GL_FALSE, glm::value_ptr(projection)
+                glGetUniformLocation(colorShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection)
             );
 
             GLint colorModelLoc = glGetUniformLocation(colorShader.Program, "model");
@@ -626,11 +624,7 @@ int main()
 
             //xcc- color de nieve
             glm::vec3 colorNieve(0.90f, 0.94f, 1.0f);
-            glUniform3fv(
-                colorShader.uniformColor,
-                1,
-                glm::value_ptr(colorNieve)
-            );
+            glUniform3fv( colorShader.uniformColor, 1, glm::value_ptr(colorNieve));
 
             glDrawArrays(GL_TRIANGLES, 0, 36);
 
@@ -1136,11 +1130,43 @@ void DoMovement()
 {
     if (modoCamara == 0)
     {
+
+        //xcc- guarda la posicion antes de mover la camara
+        glm::vec3 posicionAnterior = camera.GetPosition();
+
         float velocidadCamara = deltaTime * 12.0f;
         if (keys[GLFW_KEY_W] || keys[GLFW_KEY_UP])    camera.ProcessKeyboard(FORWARD, velocidadCamara);
         if (keys[GLFW_KEY_S] || keys[GLFW_KEY_DOWN])  camera.ProcessKeyboard(BACKWARD, velocidadCamara);
         if (keys[GLFW_KEY_A] || keys[GLFW_KEY_LEFT])  camera.ProcessKeyboard(LEFT, velocidadCamara);
         if (keys[GLFW_KEY_D] || keys[GLFW_KEY_RIGHT]) camera.ProcessKeyboard(RIGHT, velocidadCamara);
+
+        //xcc- limita el movimiento de la camara dentro del Hub
+        if (escenaActual == ESCENA_HUB)
+        {
+            glm::vec3 posicionCamara = camera.GetPosition();
+
+            //xcc- mantiene la altura de la camara
+            posicionCamara.y = 5.0f;
+
+            //xcc- limita las paredes cuando la camara entra al Hub
+            if (posicionCamara.z < 20.0f) // no te limita mientras te acercas a la puerta; los límites empiezan cuando ya estás entrando.
+            {
+                posicionCamara.x = glm::clamp(posicionCamara.x, -21.0f, 21.0f);
+                posicionCamara.z = glm::max(posicionCamara.z, -16.0f); //pone limites a donde llega la camara dentro del hub
+            }
+
+            //xcc- bloquea la pared frontal dejando libre la puerta
+            if (posicionCamara.z > 18.0f && posicionCamara.z < 21.0f)
+            {
+                if (posicionCamara.x < -3.3f || posicionCamara.x > 3.3f)
+                {
+                    posicionCamara = posicionAnterior;
+                    posicionCamara.y = 3.0f;
+                }
+            }
+
+            camera.SetPosition(posicionCamara);
+        }
     }
 
     // Niebla manual: se suma al valor del nivel (limitada en el render)

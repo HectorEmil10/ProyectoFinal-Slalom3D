@@ -125,6 +125,13 @@ public:
 		return this->position;
 	}
 
+	//xcc- permite cambiar la posicion de la camara
+	void SetPosition(glm::vec3 nuevaPosicion)
+	{
+		this->position = nuevaPosicion;
+	}
+
+
 	glm::vec3 GetFront()
 	{
 		return this->front;
