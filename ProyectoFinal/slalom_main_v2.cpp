@@ -194,9 +194,24 @@ struct Glifo
 // ---- Ventana ----
 int SCREEN_WIDTH, SCREEN_HEIGHT;
 
+//XCC -Saber en que zona estamos 
+enum EscenaActual
+{
+    ESCENA_HUB,
+    ESCENA_PISTA,
+    ESCENA_TROFEOS
+};
+
+EscenaActual escenaActual = ESCENA_HUB;
+
+
 // ---- Cámaras ----
 int modoCamara = 0;                                   // 0 = inspección, 1 = tercera persona
-Camera camera(glm::vec3(-255.0f, 52.0f, 36.0f));
+//Camera camera(glm::vec3(-255.0f, 52.0f, 36.0f));  
+
+//xcc- camara inicial frente al Hub
+Camera camera(glm::vec3(0.0f, 3.0f, 30.0f));
+
 GLfloat lastX = WIDTH / 2.0f;
 GLfloat lastY = HEIGHT / 2.0f;
 bool keys[1024];
@@ -379,6 +394,9 @@ GLuint CargarSkybox(const char* caras[6]);
 float AlphaMensaje(double inicio, float sostener, float desvanecer);
 void  DibujarHUD(Shader& hudShader);
 
+//xcc- HUD para las opciones del Hub
+void DibujarHUDHub(Shader& hudShader);
+
 // ============================================================================
 //  ETAPA 6. PROGRAMA PRINCIPAL
 // ============================================================================
@@ -472,6 +490,7 @@ int main()
     //  6.5 Carga de modelos y texturas
     // ------------------------------------------------------------------------
     Model PistaCompleta((char*)"Models/Entorno/pista.obj");
+    Model HubCentral((char*)"Models/Hub/Hub_central.obj"); //xcc
 
     GLuint texturaSkybox = CargarSkybox(CARAS_SKYBOX);
     bool hayTexturaSkybox = (texturaSkybox != 0);
@@ -621,56 +640,216 @@ int main()
         glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
         glUniform1i(glGetUniformLocation(lightingShader.Program, "transparency"), 0);
         glUniform2f(glGetUniformLocation(lightingShader.Program, "uvOffset"), 0.0f, 0.0f);
-        PistaCompleta.Draw(lightingShader);
-
-        // ---- 6.7.7 Elementos de color plano: postes, colisionadores y esquiador ----
-        colorShader.Use();
-        glUniformMatrix4fv(glGetUniformLocation(colorShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
-        glUniformMatrix4fv(glGetUniformLocation(colorShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-        GLint colorModelLoc = glGetUniformLocation(colorShader.Program, "model");
-
-        glBindVertexArray(VAO);
-
-        // Postes de límite (alternan rojo / blanco, estilo puertas de slalom)
-        for (size_t i = 0; i < postesLimite.size(); i++)
+       /* PistaCompleta.Draw(lightingShader); */
+        if (escenaActual == ESCENA_HUB)
         {
-            glm::mat4 modelPoste = glm::translate(glm::mat4(1.0f), postesLimite[i] + glm::vec3(0.0f, ALTURA_POSTE * 0.5f - DESFASE_POSTE, 0.0f));
-            modelPoste = glm::scale(modelPoste, glm::vec3(0.6f, ALTURA_POSTE, 0.6f));
-            glUniformMatrix4fv(colorModelLoc, 1, GL_FALSE, glm::value_ptr(modelPoste));
-            glm::vec3 colorPoste = ((i / 2) % 2 == 0) ? glm::vec3(0.85f, 0.10f, 0.10f) : glm::vec3(0.95f, 0.95f, 0.95f);
-            glUniform3fv(colorShader.uniformColor, 1, glm::value_ptr(colorPoste));
-            glDrawArrays(GL_TRIANGLES, 0, 36);
+            HubCentral.Draw(lightingShader);
         }
-
-        // Colisionadores (depuración, F3): verde = árbol, magenta = roca
-        if (mostrarColisionadores)
+        else if (escenaActual == ESCENA_PISTA)
         {
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-            for (size_t i = 0; i < obstaculos.size(); i++)
+            PistaCompleta.Draw(lightingShader);
+        }//xcc prueba 
+
+
+// ---- 6.7.7 Elementos de color plano: postes, colisionadores y esquiador ----
+
+//xcc- elementos visibles solo en la pista
+        if (escenaActual == ESCENA_PISTA)
+        {
+            colorShader.Use();
+
+            glUniformMatrix4fv(
+                glGetUniformLocation(colorShader.Program, "view"),
+                1, GL_FALSE, glm::value_ptr(view)
+            );
+
+            glUniformMatrix4fv(
+                glGetUniformLocation(colorShader.Program, "projection"),
+                1, GL_FALSE, glm::value_ptr(projection)
+            );
+
+            GLint colorModelLoc = glGetUniformLocation(colorShader.Program, "model");
+
+            glBindVertexArray(VAO);
+
+            // Postes de límite
+            for (size_t i = 0; i < postesLimite.size(); i++)
             {
-                const Obstaculo& o = obstaculos[i];
-                float alto = o.yMax - o.yMin;
-                glm::mat4 modelCol = glm::translate(glm::mat4(1.0f), glm::vec3(o.centro.x, o.yMin + alto * 0.5f, o.centro.z));
-                modelCol = glm::scale(modelCol, glm::vec3(o.radio * 2.0f, alto, o.radio * 2.0f));
-                glUniformMatrix4fv(colorModelLoc, 1, GL_FALSE, glm::value_ptr(modelCol));
-                glm::vec3 colorCol = o.esArbol ? glm::vec3(0.1f, 1.0f, 0.2f) : glm::vec3(1.0f, 0.2f, 1.0f);
-                glUniform3fv(colorShader.uniformColor, 1, glm::value_ptr(colorCol));
+                glm::mat4 modelPoste = glm::translate(
+                    glm::mat4(1.0f),
+                    postesLimite[i] + glm::vec3(
+                        0.0f,
+                        ALTURA_POSTE * 0.5f - DESFASE_POSTE,
+                        0.0f
+                    )
+                );
+
+                modelPoste = glm::scale(
+                    modelPoste,
+                    glm::vec3(0.6f, ALTURA_POSTE, 0.6f)
+                );
+
+                glUniformMatrix4fv(
+                    colorModelLoc,
+                    1,
+                    GL_FALSE,
+                    glm::value_ptr(modelPoste)
+                );
+
+                glm::vec3 colorPoste =
+                    ((i / 2) % 2 == 0)
+                    ? glm::vec3(0.85f, 0.10f, 0.10f)
+                    : glm::vec3(0.95f, 0.95f, 0.95f);
+
+                glUniform3fv(
+                    colorShader.uniformColor,
+                    1,
+                    glm::value_ptr(colorPoste)
+                );
+
                 glDrawArrays(GL_TRIANGLES, 0, 36);
             }
-            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+            // Colisionadores de la pista
+            if (mostrarColisionadores)
+            {
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+                for (size_t i = 0; i < obstaculos.size(); i++)
+                {
+                    const Obstaculo& o = obstaculos[i];
+
+                    float alto = o.yMax - o.yMin;
+
+                    glm::mat4 modelCol = glm::translate(
+                        glm::mat4(1.0f),
+                        glm::vec3(
+                            o.centro.x,
+                            o.yMin + alto * 0.5f,
+                            o.centro.z
+                        )
+                    );
+
+                    modelCol = glm::scale(
+                        modelCol,
+                        glm::vec3(
+                            o.radio * 2.0f,
+                            alto,
+                            o.radio * 2.0f
+                        )
+                    );
+
+                    glUniformMatrix4fv(
+                        colorModelLoc,
+                        1,
+                        GL_FALSE,
+                        glm::value_ptr(modelCol)
+                    );
+
+                    glm::vec3 colorCol =
+                        o.esArbol
+                        ? glm::vec3(0.1f, 1.0f, 0.2f)
+                        : glm::vec3(1.0f, 0.2f, 1.0f);
+
+                    glUniform3fv(
+                        colorShader.uniformColor,
+                        1,
+                        glm::value_ptr(colorCol)
+                    );
+
+                    glDrawArrays(GL_TRIANGLES, 0, 36);
+                }
+
+                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+            }
+
+            // Nodo raíz temporal del esquiador
+            glm::mat4 modelTemp = glm::mat4(1.0f);
+            modelTemp = glm::translate(modelTemp, skierPos);
+
+            modelTemp = glm::rotate(
+                modelTemp,
+                glm::radians(skierRotY),
+                glm::vec3(0.0f, 1.0f, 0.0f)
+            );
+
+            glm::mat4 modelIndicador = glm::scale(
+                modelTemp,
+                glm::vec3(1.5f, 3.0f, 1.5f)
+            );
+
+            glUniformMatrix4fv(
+                colorModelLoc,
+                1,
+                GL_FALSE,
+                glm::value_ptr(modelIndicador)
+            );
+
+            glm::vec3 colorNaranja(1.0f, 0.35f, 0.0f);
+
+            glUniform3fv(
+                colorShader.uniformColor,
+                1,
+                glm::value_ptr(colorNaranja)
+            );
+
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+
+            glBindVertexArray(0);
         }
 
-        // Nodo raíz del esquiador (indicador naranja, hasta recibir el modelo final)
-        glm::mat4 modelTemp = glm::mat4(1.0f);
-        modelTemp = glm::translate(modelTemp, skierPos);
-        modelTemp = glm::rotate(modelTemp, glm::radians(skierRotY), glm::vec3(0.0f, 1.0f, 0.0f));
-        glm::mat4 modelIndicador = glm::scale(modelTemp, glm::vec3(1.5f, 3.0f, 1.5f));
-        glUniformMatrix4fv(colorModelLoc, 1, GL_FALSE, glm::value_ptr(modelIndicador));
-        glm::vec3 colorNaranja(1.0f, 0.35f, 0.0f);
-        glUniform3fv(colorShader.uniformColor, 1, glm::value_ptr(colorNaranja));
-        glDrawArrays(GL_TRIANGLES, 0, 36);
 
-        glBindVertexArray(0);
+        //xcc- terreno amplio alrededor del Hub
+        if (escenaActual == ESCENA_HUB)
+        {
+            colorShader.Use();
+
+            glUniformMatrix4fv(
+                glGetUniformLocation(colorShader.Program, "view"),
+                1, GL_FALSE, glm::value_ptr(view)
+            );
+
+            glUniformMatrix4fv(
+                glGetUniformLocation(colorShader.Program, "projection"),
+                1, GL_FALSE, glm::value_ptr(projection)
+            );
+
+            GLint colorModelLoc = glGetUniformLocation(colorShader.Program, "model");
+
+            glBindVertexArray(VAO);
+
+            glm::mat4 sueloHub = glm::mat4(1.0f);
+
+            //xcc- nieve debajo del Hub
+            sueloHub = glm::translate(
+                sueloHub,
+                glm::vec3(0.0f, -0.11f, 0.0f)
+            );
+
+            sueloHub = glm::scale(
+                sueloHub,
+                glm::vec3(500.0f, 0.10f, 500.0f)
+            );
+
+            glUniformMatrix4fv(
+                colorModelLoc,
+                1,
+                GL_FALSE,
+                glm::value_ptr(sueloHub)
+            );
+
+            glm::vec3 colorNieve(0.90f, 0.94f, 1.0f);
+
+            glUniform3fv(
+                colorShader.uniformColor,
+                1,
+                glm::value_ptr(colorNieve)
+            );
+
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+
+            glBindVertexArray(0);
+        }
 
         // ---- 6.7.8 Skybox (se dibuja al final con prueba de profundidad LEQUAL) ----
         glDepthFunc(GL_LEQUAL);
@@ -700,7 +879,16 @@ int main()
         glDepthFunc(GL_LESS);
 
         // ---- 6.7.9 Interfaz 2D (ventisca + HUD) ----
-        DibujarHUD(hudShader);
+
+        //xcc- muestra el HUD correspondiente a cada escena
+        if (escenaActual == ESCENA_HUB)
+        {
+            DibujarHUDHub(hudShader);
+        }
+        else if (escenaActual == ESCENA_PISTA)
+        {
+            DibujarHUD(hudShader);
+        }
 
         // ---- 6.7.10 Intercambio de buffers ----
         glfwSwapBuffers(window);
@@ -1417,6 +1605,28 @@ static void DibujarVentisca(Shader& hud)
  *        escena sin prueba de profundidad.
  * @param hudShader Shader del HUD.
  */
+
+ //xcc- muestra la dificultad seleccionada en el Hub
+void DibujarHUDHub(Shader& hudShader)
+{
+    glDisable(GL_DEPTH_TEST);
+    hudShader.Use();
+
+    glm::mat4 ortho = glm::ortho( 0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT, 0.0f);
+
+    glUniformMatrix4fv( glGetUniformLocation(hudShader.Program, "ortho"), 1, GL_FALSE, glm::value_ptr(ortho));
+
+    float e = SCREEN_HEIGHT / 800.0f;
+
+    //xcc- instrucciones de seleccion
+    DibujarTexto( hudShader, "SELECCIONA DIFICULTAD: 1 2 3", 20.0f * e, 20.0f * e, 3.0f * e, glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), false);
+
+    //xcc- muestra la opcion actual
+    DibujarTexto( hudShader, NOMBRES_NIVEL[nivelActual], 20.0f * e, 60.0f * e, 3.0f * e, glm::vec4(1.0f, 0.85f, 0.4f, 1.0f), false);
+
+    glEnable(GL_DEPTH_TEST);
+}
+
 void DibujarHUD(Shader& hudShader)
 {
     glDisable(GL_DEPTH_TEST);
@@ -1510,11 +1720,43 @@ void DoMovement()
 {
     if (modoCamara == 0)
     {
+
+        //xcc- guarda la posicion antes de mover la camara
+        glm::vec3 posicionAnterior = camera.GetPosition();
+
         float velocidadCamara = deltaTime * 12.0f;
         if (keys[GLFW_KEY_W] || keys[GLFW_KEY_UP])    camera.ProcessKeyboard(FORWARD, velocidadCamara);
         if (keys[GLFW_KEY_S] || keys[GLFW_KEY_DOWN])  camera.ProcessKeyboard(BACKWARD, velocidadCamara);
         if (keys[GLFW_KEY_A] || keys[GLFW_KEY_LEFT])  camera.ProcessKeyboard(LEFT, velocidadCamara);
         if (keys[GLFW_KEY_D] || keys[GLFW_KEY_RIGHT]) camera.ProcessKeyboard(RIGHT, velocidadCamara);
+
+        //xcc- limita el movimiento de la camara dentro del Hub
+        if (escenaActual == ESCENA_HUB)
+        {
+            glm::vec3 posicionCamara = camera.GetPosition();
+
+            //xcc- mantiene la altura de la camara
+            posicionCamara.y = 5.0f;
+
+            //xcc- limita las paredes cuando la camara entra al Hub
+            if (posicionCamara.z < 20.0f) // no te limita mientras te acercas a la puerta; los límites empiezan cuando ya estás entrando.
+            {
+                posicionCamara.x = glm::clamp(posicionCamara.x, -21.0f, 21.0f);
+                posicionCamara.z = glm::max(posicionCamara.z, -16.0f); //pone limites a donde llega la camara dentro del hub
+            }
+
+            //xcc- bloquea la pared frontal dejando libre la puerta
+            if (posicionCamara.z > 18.0f && posicionCamara.z < 21.0f)
+            {
+                if (posicionCamara.x < -3.3f || posicionCamara.x > 3.3f)
+                {
+                    posicionCamara = posicionAnterior;
+                    posicionCamara.y = 3.0f;
+                }
+            }
+
+            camera.SetPosition(posicionCamara);
+        }
     }
 
     // Niebla manual: se suma al valor del nivel (limitada en el render)
@@ -1538,6 +1780,28 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         else if (action == GLFW_RELEASE) keys[key] = false;
     }
 
+
+    //xcc- cambia del Hub a la pista cerca de la salida donde dice "pista"
+    if (key == GLFW_KEY_E && action == GLFW_PRESS && escenaActual == ESCENA_HUB)
+    {
+        glm::vec3 posicionCamara = camera.GetPosition();
+
+        //xcc- zona de salida trasera del Hub
+        if (posicionCamara.z < -12.0f &&
+            posicionCamara.x > -5.0f &&
+            posicionCamara.x < 5.0f)
+        {
+            escenaActual = ESCENA_PISTA;
+            modoCamara = 1;
+
+            skierPos = posSalida;
+            estadoCarrera = 0;
+            velActual = 0.0f;
+
+            std::cout << "Cambio de escena: Hub -> Pista" << std::endl;
+        }
+    }
+
     // Cambio de cámara
     if (key == GLFW_KEY_C && action == GLFW_PRESS)
     {
@@ -1549,8 +1813,8 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
     if (key == GLFW_KEY_P && action == GLFW_PRESS)
     {
         std::cout << "Coordenada actual -> glm::vec3(" << camera.GetPosition().x
-                  << "f, " << camera.GetPosition().y
-                  << "f, " << camera.GetPosition().z << "f);" << std::endl;
+            << "f, " << camera.GetPosition().y
+            << "f, " << camera.GetPosition().z << "f);" << std::endl;
     }
 
     if (key == GLFW_KEY_F1 && action == GLFW_PRESS)
@@ -1584,7 +1848,11 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
     }
 
     // Inicio de carrera
-    if (key == GLFW_KEY_R && action == GLFW_PRESS)
+
+    //xcc- inicia la carrera solo desde la pista
+    if (key == GLFW_KEY_R && action == GLFW_PRESS && escenaActual == ESCENA_PISTA)
+
+
     {
         skierPos = posSalida;
         estadoCarrera = 1;
@@ -1608,19 +1876,21 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         std::cout << ">>> Esquiador posicionado en la puerta de Salida (START)." << std::endl;
     }
 
-    // Niveles de dificultad: solo configurables antes de iniciar la carrera
+    // Niveles de dificultad y clima (la transición se interpola en ActualizarAmbiente)
+   //xcc- selecciona dificultad y clima desde el Hub
     if (action == GLFW_PRESS && key >= GLFW_KEY_1 && key <= GLFW_KEY_3)
     {
-        if (estadoCarrera == 0)
+        if (escenaActual == ESCENA_HUB)
         {
             nivelActual = key - GLFW_KEY_1;
             ajusteNieblaManual = 0.0f;
-            tiempoMensajeNivel = glfwGetTime();
-            std::cout << "Dificultad/Clima: " << NOMBRES_NIVEL[nivelActual] << std::endl;
+
+            std::cout << "Seleccion en Hub: " << NOMBRES_NIVEL[nivelActual] << std::endl;
         }
-        else
+        else if (escenaActual == ESCENA_PISTA)
         {
-            tiempoAvisoNivel = glfwGetTime();   // Cambio rechazado: se avisa en pantalla
+            //xcc- evita cambiar la dificultad desde la pista
+            tiempoAvisoNivel = glfwGetTime();
         }
     }
 }
@@ -1628,21 +1898,21 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 /**
  * @brief Callback de mouse: orienta la cámara de inspección.
  */
-void MouseCallback(GLFWwindow* window, double xPos, double yPos)
-{
-    if (firstMouse)
+    void MouseCallback(GLFWwindow* window, double xPos, double yPos)
     {
+        if (firstMouse)
+        {
+            lastX = (GLfloat)xPos;
+            lastY = (GLfloat)yPos;
+            firstMouse = false;
+        }
+
+        GLfloat xOffset = (GLfloat)xPos - lastX;
+        GLfloat yOffset = lastY - (GLfloat)yPos;
+
         lastX = (GLfloat)xPos;
         lastY = (GLfloat)yPos;
-        firstMouse = false;
+
+        if (modoCamara == 0)
+            camera.ProcessMouseMovement(xOffset, yOffset);
     }
-
-    GLfloat xOffset = (GLfloat)xPos - lastX;
-    GLfloat yOffset = lastY - (GLfloat)yPos;
-
-    lastX = (GLfloat)xPos;
-    lastY = (GLfloat)yPos;
-
-    if (modoCamara == 0)
-        camera.ProcessMouseMovement(xOffset, yOffset);
-}

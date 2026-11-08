@@ -211,12 +211,27 @@ public:
 
 GLint TextureFromFile(const char *path, string directory)
 {
-	// Conservar solo el nombre del archivo (Blender puede escribir rutas absolutas)
-	string filename = string(path);
-	size_t pos = filename.find_last_of("/\\");
-	if (pos != string::npos)
-		filename = filename.substr(pos + 1);
-	filename = directory + '/' + filename;
+	// Conservar solo el nombre del archivo (Blender puede escribir rutas absolutas) , o la ruta relativa 
+	string rutaTextura = string(path);
+	string filename;
+
+	//xcc- conserva las subcarpetas de las texturas, 
+	bool rutaAbsoluta = (rutaTextura.size() > 1 && rutaTextura[1] == ':') ||	(!rutaTextura.empty() &&	(rutaTextura[0] == '/' || rutaTextura[0] == '\\'));
+
+	if (rutaAbsoluta)
+	{
+		size_t pos = rutaTextura.find_last_of("/\\");
+
+		string nombreArchivo =	(pos != string::npos)	? rutaTextura.substr(pos + 1)	: rutaTextura;
+
+		filename = directory + '/' + nombreArchivo;
+	}
+	else
+	{
+		filename = directory + '/' + rutaTextura;
+	}
+
+
 
 	GLuint textureID;
 	glGenTextures(1, &textureID);
