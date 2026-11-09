@@ -205,11 +205,18 @@ enum EscenaActual
 
 EscenaActual escenaActual = ESCENA_HUB;
 
+//xcc- camara inicial frente al Hub
+Camera camera(glm::vec3(0.0f, 3.0f, 30.0f));
+
 // Posición base de cada pedestal de trofeos (calibrar con la tecla P dentro de la sala)
 std::vector<glm::vec3> posicionesTrofeos = {
     glm::vec3(-9.0f, 0.0f, -6.0f), glm::vec3(-3.0f, 0.0f, -6.0f),
     glm::vec3(3.0f, 0.0f, -6.0f), glm::vec3(9.0f, 0.0f, -6.0f)
 };
+
+//xcc- guarda cuales trofeos se han desbloqueado
+bool trofeosDesbloqueados[4] = { false, false, false, false};
+
 float factorInteriorHub = 0.0f;   // 0 = afuera del Hub, 1 = adentro (suavizado)
 
 
@@ -218,7 +225,9 @@ int modoCamara = 0;                                   // 0 = inspección, 1 = te
 //Camera camera(glm::vec3(-255.0f, 52.0f, 36.0f));  
 
 //xcc- camara inicial frente al Hub
-Camera camera(glm::vec3(0.0f, 3.0f, 30.0f));
+//Camera camera(glm::vec3(0.0f, 3.0f, 30.0f));
+
+
 
 GLfloat lastX = WIDTH / 2.0f;
 GLfloat lastY = HEIGHT / 2.0f;
@@ -412,6 +421,14 @@ bool CercaSalidaPista()
     return posicionCamara.z < -7.0f && posicionCamara.x > -7.0f && posicionCamara.x < 7.0f;
 }
 
+//xcc- verifica si la camara esta cerca de la entrada a trofeos
+bool CercaEntradaTrofeos()
+{
+    glm::vec3 posicionCamara = camera.GetPosition();
+
+    return posicionCamara.x > 13.0f && posicionCamara.x < 29.0f && posicionCamara.z > -3.0f && posicionCamara.z < 5.0f;
+}
+
 //xcc- verifica colisiones con los muebles del Hub
 bool ColisionMueblesHub(glm::vec3 posicion)
 {
@@ -563,6 +580,63 @@ bool ColisionMueblesHub(glm::vec3 posicion)
     return false;
 }
 
+//xcc- verifica colisiones dentro de la sala de trofeos
+bool ColisionMueblesTrofeos(glm::vec3 posicion)
+{
+
+    //xcc- colision con banca central
+    if (posicion.x > -0.7f && posicion.x < 0.9f &&
+        posicion.z > 3.0f && posicion.z < 3.9f)
+    {
+        return true;
+    }
+
+    //xcc- colision con banca derecha
+    if (posicion.x > 3.6f && posicion.x < 5.4f &&
+        posicion.z > 2.2f && posicion.z < 3.1f)
+    {
+        return true;
+    }
+
+    //xcc- colision con banca izquierda
+    if (posicion.x > -5.7f && posicion.x < -3.8f &&
+        posicion.z > 2.4f && posicion.z < 3.5f)
+    {
+        return true;
+    }
+
+    //xcc- colision con el podio
+    if (posicion.x > -2.65f && posicion.x < 2.77f &&
+        posicion.z > 0.37f && posicion.z < 1.39f)
+    {
+        return true;
+    }
+
+    //xcc- colision con las vitrinas
+    if (posicion.x > -5.59f && posicion.x < 5.70f &&
+        posicion.z > -3.60f && posicion.z < -1.95f)
+    {
+        return true;
+    }
+
+
+    //xcc- colision con planta izquierda
+    if (posicion.x > -4.1f && posicion.x < -3.2f &&
+        posicion.z > -0.55f && posicion.z < 0.35f)
+    {
+        return true;
+    }
+
+    //xcc- colision con planta derecha
+    if (posicion.x > 3.3f && posicion.x < 4.2f &&
+        posicion.z > -0.65f && posicion.z < 0.25f)
+    {
+        return true;
+    }
+
+    return false;
+}
+
 void DoMovement();
 
 // ---- Lógica del juego ----
@@ -579,6 +653,11 @@ bool CercaPanelConfiguracion();
 bool CercaSalidaPista();
 //xcc- verifica colisiones con los muebles del Hub
 bool ColisionMueblesHub(glm::vec3 posicion);
+//xcc- colisiones de los muebles de trofeos
+bool ColisionMueblesTrofeos(glm::vec3 posicion);
+//xcc- verifica si esta cerca de la entrada a trofeos
+bool CercaEntradaTrofeos();
+
 
 // ---- Ventisca ----
 void InicializarCopos();
@@ -593,6 +672,9 @@ void  DibujarHUD(Shader& hudShader);
 
 //xcc- HUD para las opciones del Hub
 void DibujarHUDHub(Shader& hudShader);
+
+//xcc- aviso para regresar al Hub
+void DibujarAvisoVolverHub(Shader& hudShader);
 
 // ============================================================================
 //  ETAPA 6. PROGRAMA PRINCIPAL
@@ -637,8 +719,12 @@ int main()
 
     glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     glEnable(GL_DEPTH_TEST);
+
+    //xcc- activa transparencias para vidrios y vitrinas
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+
 
     // ------------------------------------------------------------------------
     //  6.3 Carga de shaders
@@ -688,6 +774,8 @@ int main()
     // ------------------------------------------------------------------------
     Model PistaCompleta((char*)"Models/Entorno/pista.obj");
     Model HubCentral((char*)"Models/Hub/Hub_central.obj"); //xcc
+    //xcc- carga la sala de trofeos
+    Model SalaTrofeos((char*)"Models/Trofeos/Sala_Trofeos.obj");
 
     GLuint texturaSkybox = CargarSkybox(CARAS_SKYBOX);
     bool hayTexturaSkybox = (texturaSkybox != 0);
@@ -834,10 +922,27 @@ int main()
         {
             HubCentral.Draw(lightingShader);
         }
-        else if (escenaActual == ESCENA_PISTA)
+        else if (escenaActual == ESCENA_PISTA)//xcc
         {
             PistaCompleta.Draw(lightingShader);
-        }//xcc prueba 
+        }
+        else if (escenaActual == ESCENA_TROFEOS)
+        {
+            //xcc- aumenta la luz ambiental dentro de trofeos
+            glUniform3f(
+                glGetUniformLocation(lightingShader.Program, "dirLight.ambient"),
+                0.42f, 0.38f, 0.32f
+            );
+
+            //xcc- ilumina un poco mas los materiales
+            glUniform3f(
+                glGetUniformLocation(lightingShader.Program, "dirLight.diffuse"),
+                0.75f, 0.70f, 0.65f
+            );
+
+            //xcc- dibuja la sala de trofeos
+            SalaTrofeos.Draw(lightingShader);
+        }
 
 
 // ---- 6.7.7 Elementos de color plano: postes, colisionadores y esquiador ----
@@ -961,7 +1066,7 @@ int main()
 
 
         //xcc- terreno amplio alrededor del Hub
-        if (escenaActual == ESCENA_HUB)
+        if (escenaActual == ESCENA_HUB || escenaActual == ESCENA_TROFEOS)
         {
             colorShader.Use();
 
@@ -1028,6 +1133,15 @@ int main()
         else if (escenaActual == ESCENA_PISTA)
         {
             DibujarHUD(hudShader);
+
+            //xcc- muestra el regreso al Hub antes de iniciar o al terminar
+            if (estadoCarrera == 0 || estadoCarrera == 2)
+                DibujarAvisoVolverHub(hudShader);
+        }
+        else if (escenaActual == ESCENA_TROFEOS)
+        {
+            //xcc- muestra como regresar al Hub
+            DibujarAvisoVolverHub(hudShader);
         }
 
         // ---- 6.7.10 Intercambio de buffers ----
@@ -1532,6 +1646,15 @@ void ActualizarCarrera(Model& terreno)
         tiempoMensajeMeta = ahora;
         velActual = 0.0f;
         std::cout << "META CRUZADA - Tiempo final: " << tiempoFinalCarrera << " seg" << std::endl;
+
+        //xcc- desbloquea trofeos al terminar la carrera
+        trofeosDesbloqueados[0] = true;
+
+        if (nivelActual >= 1)
+            trofeosDesbloqueados[1] = true;
+
+        if (nivelActual >= 2)
+            trofeosDesbloqueados[2] = true;
     }
 }
 
@@ -1784,8 +1907,31 @@ void DibujarHUDHub(Shader& hudShader)
         DibujarTexto( hudShader, "PRESIONA E PARA IR A PISTA",0.0f, SCREEN_HEIGHT - 70.0f * e, 3.0f * e, glm::vec4(0.0, 0.0, 0.0, 1.0f), true);
     }
 
+    //xcc- muestra aviso cerca de la entrada a trofeos
+    if (CercaEntradaTrofeos())
+    {
+        DibujarTexto( hudShader, "PRESIONA E PARA IR A TROFEOS",0.0f, SCREEN_HEIGHT - 70.0f * e, 3.0f * e, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), true);
+    }
+
         glEnable(GL_DEPTH_TEST);
    
+}
+
+//xcc- muestra el aviso para regresar al Hub
+void DibujarAvisoVolverHub(Shader& hudShader)
+{
+    glDisable(GL_DEPTH_TEST);
+    hudShader.Use();
+
+    glm::mat4 ortho = glm::ortho(0.0f, (float)SCREEN_WIDTH, 0.0f, (float)SCREEN_HEIGHT);
+    glUniformMatrix4fv(glGetUniformLocation(hudShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(ortho));
+
+    float e = SCREEN_HEIGHT / 800.0f;
+
+    DibujarTexto(hudShader, "PRESIONA H PARA VOLVER AL HUB", 0.0f, 35.0f * e, 2.5f * e,
+        glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), true);
+
+    glEnable(GL_DEPTH_TEST);
 }
 
 void DibujarHUD(Shader& hudShader)
@@ -1891,10 +2037,10 @@ void DoMovement()
             posicionCamara.y = 5.0f;
 
             //xcc- limita las paredes cuando la camara entra al Hub
-            if (posicionCamara.z < 20.0f) // no te limita mientras te acercas a la puerta; los límites empiezan cuando ya estás entrando.
+            if (posicionCamara.z < 20.0f)
             {
                 posicionCamara.x = glm::clamp(posicionCamara.x, -21.0f, 21.0f);
-                posicionCamara.z = glm::max(posicionCamara.z, -16.0f); //pone limites a donde llega la camara dentro del hub
+                posicionCamara.z = glm::max(posicionCamara.z, -16.0f);
             }
 
             //xcc- bloquea la pared frontal dejando libre la puerta
@@ -1903,27 +2049,51 @@ void DoMovement()
                 if (posicionCamara.x < -3.3f || posicionCamara.x > 3.3f)
                 {
                     posicionCamara = posicionAnterior;
-                    posicionCamara.y = 3.0f;
+                    posicionCamara.y = 5.0f;
                 }
             }
 
-            //xcc- corrige atravesar cada mueve por cada eje
-            glm::vec3 pruebaX(posicionCamara.x, 3.0f, posicionAnterior.z);
+            //xcc- corrige la colision de muebles por cada eje
+            glm::vec3 pruebaX(posicionCamara.x, 5.0f, posicionAnterior.z);
 
             if (ColisionMueblesHub(pruebaX))
-            {
-                posicionCamara.x = posicionAnterior.x;
-            }
+              posicionCamara.x = posicionAnterior.x;
 
-            glm::vec3 pruebaZ(posicionCamara.x, 3.0f, posicionCamara.z);
+            glm::vec3 pruebaZ(posicionCamara.x, 5.0f, posicionCamara.z);
 
             if (ColisionMueblesHub(pruebaZ))
-            {
                 posicionCamara.z = posicionAnterior.z;
-            }
 
             camera.SetPosition(posicionCamara);
         }
+
+        //xcc- limita el movimiento dentro de la sala de trofeos
+        if (escenaActual == ESCENA_TROFEOS)
+        {
+            glm::vec3 posicionCamara = camera.GetPosition();
+
+            //xcc- mantiene la altura de la camara
+            posicionCamara.y = 1.7f;
+
+            //xcc- limita las paredes laterales
+            posicionCamara.x = glm::clamp(posicionCamara.x, -5.7f, 5.7f);
+
+            //xcc- limita la pared del fondo y deja libre la entrada
+            posicionCamara.z = glm::max(posicionCamara.z, -3.6f);
+
+            //xcc- corrige las colisiones de trofeos por cada eje
+            glm::vec3 pruebaX(posicionCamara.x, 1.7f, posicionAnterior.z);
+            if (ColisionMueblesTrofeos(pruebaX))
+                posicionCamara.x = posicionAnterior.x;
+
+            glm::vec3 pruebaZ(posicionCamara.x, 1.7f, posicionCamara.z);
+            if (ColisionMueblesTrofeos(pruebaZ))
+                posicionCamara.z = posicionAnterior.z;
+
+            camera.SetPosition(posicionCamara);
+        }
+
+
     }
 
     // Niebla manual: se suma al valor del nivel (limitada en el render)
@@ -1961,6 +2131,25 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         std::cout << "Cambio de escena: Hub -> Pista" << std::endl;
     }
 
+    //xcc- cambia del Hub a la sala de trofeos
+    if (key == GLFW_KEY_E && action == GLFW_PRESS && escenaActual == ESCENA_HUB && CercaEntradaTrofeos())
+    {
+        escenaActual = ESCENA_TROFEOS;
+        modoCamara = 0;
+        camera.SetPosition(glm::vec3(0.0f, 3.0f, 10.0f));
+
+        std::cout << "Cambio de escena: Hub -> Trofeos" << std::endl;
+    }
+
+    //xcc- regresa al Hub desde pista o trofeos
+    if (key == GLFW_KEY_H && action == GLFW_PRESS &&
+        (escenaActual == ESCENA_PISTA || escenaActual == ESCENA_TROFEOS))
+    {
+        escenaActual = ESCENA_HUB;
+        modoCamara = 0;
+        camera.SetPosition(glm::vec3(0.0f, 3.0f, 30.0f));
+        std::cout << "Cambio de escena: regreso al Hub" << std::endl;
+    }
 
     // Cambio de cámara
     if (key == GLFW_KEY_C && action == GLFW_PRESS)
