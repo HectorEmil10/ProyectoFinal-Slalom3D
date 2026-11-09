@@ -422,9 +422,47 @@ bool ColisionMueblesHub(glm::vec3 posicion)
         return true;
     }
 
-    //xcc- mueble del lado izquierdo
-    if (posicion.x > -12.0f && posicion.x < -7.0f &&
-        posicion.z > 10.5f && posicion.z < 15.0f)
+    //xcc- colision con la parte de atras de la maqueta
+    if (posicion.x > -21.5f && posicion.x < -20.5f &&
+        posicion.z > 11.0f && posicion.z < 15.0f)
+    {
+        return true;
+    }
+
+    //xcc- colision con la mesa del escritorio
+    if (posicion.x > -20.44f && posicion.x < -9.90f &&
+        posicion.z > 11.54f && posicion.z < 14.93f)
+    {
+        return true;
+    }
+    
+
+    //xcc- colision con silla 1
+    if (posicion.x > -17.8f && posicion.x < -16.1f &&
+        posicion.z > 15.6f && posicion.z < 17.3f)
+    {
+        return true;
+    }
+
+    //xcc- colision con silla 2
+    if (posicion.x > -13.3f && posicion.x < -11.6f &&
+        posicion.z > 8.9f && posicion.z < 10.6f)
+    {
+        return true;
+    }
+
+    //xcc- colision con silla 3
+    if (posicion.x > -17.4f && posicion.x < -15.6f &&
+        posicion.z > 9.4f && posicion.z < 11.2f)
+    {
+        return true;
+    }
+
+   
+
+    //xcc- colision con mueble de la pared izquierda
+    if (posicion.x > -20.2f && posicion.x < -18.2f &&
+        posicion.z > 1.8f && posicion.z < 3.6f)
     {
         return true;
     }
@@ -1869,11 +1907,19 @@ void DoMovement()
                 }
             }
 
-            //xcc- evita atravesar los muebles del Hub
-            if (ColisionMueblesHub(posicionCamara))
+            //xcc- corrige atravesar cada mueve por cada eje
+            glm::vec3 pruebaX(posicionCamara.x, 3.0f, posicionAnterior.z);
+
+            if (ColisionMueblesHub(pruebaX))
             {
-                posicionCamara = posicionAnterior;
-                posicionCamara.y = 3.0f;
+                posicionCamara.x = posicionAnterior.x;
+            }
+
+            glm::vec3 pruebaZ(posicionCamara.x, 3.0f, posicionCamara.z);
+
+            if (ColisionMueblesHub(pruebaZ))
+            {
+                posicionCamara.z = posicionAnterior.z;
             }
 
             camera.SetPosition(posicionCamara);
