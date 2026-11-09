@@ -39,7 +39,7 @@
  *      Mouse                : orientar cámara de inspección
  *      C                    : alternar cámara (inspección / tercera persona)
  *      R                    : iniciar descenso        T : volver a la salida
- *      1 / 2 / 3            : nivel de dificultad y clima (solo en la salida)
+ *      1 / 2 / 3 : nivel de dificultad y clima (solo en el Hub)
  *      V                    : activar / desactivar ventisca
  *      N / M                : aumentar / disminuir niebla manualmente
  *      F3                   : mostrar / ocultar colisionadores (depuración)
@@ -77,6 +77,7 @@
 #include "Shader.h"
 #include "Camera.h"
 #include "Model.h"
+#include "Iluminacion.h"
 
 // ============================================================================
 //  ETAPA 2. CONSTANTES DE CONFIGURACIÓN
@@ -204,6 +205,13 @@ enum EscenaActual
 
 EscenaActual escenaActual = ESCENA_HUB;
 
+// Posición base de cada pedestal de trofeos (calibrar con la tecla P dentro de la sala)
+std::vector<glm::vec3> posicionesTrofeos = {
+    glm::vec3(-9.0f, 0.0f, -6.0f), glm::vec3(-3.0f, 0.0f, -6.0f),
+    glm::vec3(3.0f, 0.0f, -6.0f), glm::vec3(9.0f, 0.0f, -6.0f)
+};
+float factorInteriorHub = 0.0f;   // 0 = afuera del Hub, 1 = adentro (suavizado)
+
 
 // ---- Cámaras ----
 int modoCamara = 0;                                   // 0 = inspección, 1 = tercera persona
@@ -254,7 +262,6 @@ double tiempoMensajeSalida    = -1.0;
 double tiempoMensajeMeta      = -1.0;
 double tiempoAvisoLimite      = -1.0;
 double tiempoMensajeNivel     = -1.0;
-double tiempoAvisoNivel       = -1.0;
 double tiempoAvisoChoque      = -1.0;
 double tiempoAyudaControles   = -1.0;
 double tiempoMensajeVentisca  = -1.0;
@@ -590,44 +597,31 @@ int main()
         glUniform3f(glGetUniformLocation(lightingShader.Program, "material.specular"), 0.6f, 0.6f, 0.6f);
         glUniform1f(glGetUniformLocation(lightingShader.Program, "material.shininess"), 32.0f);
 
-        // Niebla (nivel de dificultad + ajuste manual N/M + ventisca)
-        float densidadNiebla = glm::clamp(ambienteActual.densidadNiebla + ajusteNieblaManual
-                                          + intensidadVentisca * NIEBLA_EXTRA_VENTISCA, 0.0f, 0.02f);
-        glUniform1f(glGetUniformLocation(lightingShader.Program, "fogDensity"), densidadNiebla);
-        glUniform3f(glGetUniformLocation(lightingShader.Program, "fogColor"),
-                    ambienteActual.colorNiebla.r, ambienteActual.colorNiebla.g, ambienteActual.colorNiebla.b);
+        // Esquema base: sol de atardecer (pista y exterior del Hub)
+        EsquemaIluminacion esquema;
+        esquema.dirDireccion = direccionSol;
+        esquema.dirAmbiente = ambienteActual.colorAmbiente * (0.6f + 0.4f * ambienteActual.intensidadSol);
+        esquema.dirDifusa = ambienteActual.colorSol * ambienteActual.intensidadSol;
+        esquema.dirEspecular = ambienteActual.colorSol * 0.5f;
+        esquema.colorNiebla = ambienteActual.colorNiebla;
+        esquema.densidadNiebla = glm::clamp(ambienteActual.densidadNiebla + ajusteNieblaManual
+            + intensidadVentisca * NIEBLA_EXTRA_VENTISCA, 0.0f, 0.02f);
 
-        // Luz direccional: sol de atardecer (baja, cálida, ambiente fría)
-        glm::vec3 solAmbiente  = ambienteActual.colorAmbiente * (0.6f + 0.4f * ambienteActual.intensidadSol);
-        glm::vec3 solDifuso    = ambienteActual.colorSol * ambienteActual.intensidadSol;
-        glm::vec3 solEspecular = ambienteActual.colorSol * 0.5f;
-        glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.direction"), direccionSol.x, direccionSol.y, direccionSol.z);
-        glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.ambient"),  solAmbiente.r, solAmbiente.g, solAmbiente.b);
-        glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.diffuse"),  solDifuso.r, solDifuso.g, solDifuso.b);
-        glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.specular"), solEspecular.r, solEspecular.g, solEspecular.b);
-
-        // Luces posicionales (Hub y Sala de Trofeos)
-        for (int i = 0; i < 4; i++)
+        // Esquemas interiores
+        if (escenaActual == ESCENA_HUB)
         {
-            std::string num = std::to_string(i);
-            glUniform3f(glGetUniformLocation(lightingShader.Program, ("pointLights[" + num + "].position").c_str()), pointLightPositions[i].x, pointLightPositions[i].y, pointLightPositions[i].z);
-            glUniform3f(glGetUniformLocation(lightingShader.Program, ("pointLights[" + num + "].ambient").c_str()), 0.15f, 0.15f, 0.12f);
-            glUniform3f(glGetUniformLocation(lightingShader.Program, ("pointLights[" + num + "].diffuse").c_str()), 0.9f, 0.85f, 0.7f);
-            glUniform3f(glGetUniformLocation(lightingShader.Program, ("pointLights[" + num + "].specular").c_str()), 1.0f, 1.0f, 1.0f);
-            glUniform1f(glGetUniformLocation(lightingShader.Program, ("pointLights[" + num + "].constant").c_str()), 1.0f);
-            glUniform1f(glGetUniformLocation(lightingShader.Program, ("pointLights[" + num + "].linear").c_str()), 0.09f);
-            glUniform1f(glGetUniformLocation(lightingShader.Program, ("pointLights[" + num + "].quadratic").c_str()), 0.032f);
+            glm::vec3 p = camera.GetPosition();
+            bool dentroHub = (p.z < 19.0f && std::abs(p.x) < 21.0f);   // Mismos límites que DoMovement
+            factorInteriorHub = Suavizar(factorInteriorHub, dentroHub ? 1.0f : 0.0f, 4.0f, deltaTime);
+            esquema = EsquemaHub(currentFrame, nivelActual, factorInteriorHub, esquema);
+        }
+        else if (escenaActual == ESCENA_TROFEOS)
+        {
+            esquema = EsquemaTrofeos(currentFrame, posicionesTrofeos);
         }
 
-        // SpotLight (apagada)
-        glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.ambient"), 0.0f, 0.0f, 0.0f);
-        glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.diffuse"), 0.0f, 0.0f, 0.0f);
-        glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.specular"), 0.0f, 0.0f, 0.0f);
-        glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.constant"), 1.0f);
-        glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.linear"), 0.09f);
-        glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.quadratic"), 0.032f);
-        glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.cutOff"), glm::cos(glm::radians(12.5f)));
-        glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.outerCutOff"), glm::cos(glm::radians(17.5f)));
+        EnviarEsquema(lightingShader, esquema);
+        float densidadNiebla = esquema.densidadNiebla;   // La usa el skybox más abajo
 
         GLint modelLoc = glGetUniformLocation(lightingShader.Program, "model");
         GLint viewLoc  = glGetUniformLocation(lightingShader.Program, "view");
@@ -1336,13 +1330,13 @@ void ActualizarCarrera(Model& terreno)
     {
         float anguloObjetivo = anguloBase;
 
-        if (keys[GLFW_KEY_A] || keys[GLFW_KEY_LEFT])
+        if (keys[GLFW_KEY_D] || keys[GLFW_KEY_RIGHT])
         {
             skierPos.x -= dirDerecha.x * ambienteActual.velocidadLateral * deltaTime;
             skierPos.z -= dirDerecha.y * ambienteActual.velocidadLateral * deltaTime;
             anguloObjetivo = anguloBase - ANGULO_GIRO_ESQUIADOR;
         }
-        else if (keys[GLFW_KEY_D] || keys[GLFW_KEY_RIGHT])
+        else if (keys[GLFW_KEY_A] || keys[GLFW_KEY_LEFT])
         {
             skierPos.x += dirDerecha.x * ambienteActual.velocidadLateral * deltaTime;
             skierPos.z += dirDerecha.y * ambienteActual.velocidadLateral * deltaTime;
@@ -1621,8 +1615,10 @@ void DibujarHUDHub(Shader& hudShader)
     //xcc- instrucciones de seleccion
     DibujarTexto( hudShader, "SELECCIONA DIFICULTAD: 1 2 3", 20.0f * e, 20.0f * e, 3.0f * e, glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), false);
 
-    //xcc- muestra la opcion actual
-    DibujarTexto( hudShader, NOMBRES_NIVEL[nivelActual], 20.0f * e, 60.0f * e, 3.0f * e, glm::vec4(1.0f, 0.85f, 0.4f, 1.0f), false);
+    //xcc- mensaje al seleccionar dificultad (igual que en la pista)
+    float aNivel = AlphaMensaje(tiempoMensajeNivel, 0.8f, TIEMPO_MENSAJE_CORTO);
+    if (aNivel > 0.0f)
+        DibujarTexto(hudShader, NOMBRES_NIVEL[nivelActual], 0.0f, SCREEN_HEIGHT * 0.42f, 6.0f * e, glm::vec4(1.0f, 0.75f, 0.35f, aNivel), true);
 
     glEnable(GL_DEPTH_TEST);
 }
@@ -1657,7 +1653,7 @@ void DibujarHUD(Shader& hudShader)
     {
         float pulso = 0.65f + 0.35f * (float)std::sin(ahora * 3.0);
         DibujarTexto(hudShader, "PRESIONA R PARA INICIAR", 0.0f, SCREEN_HEIGHT - 70.0f * e, 3.5f * e, glm::vec4(1.0f, 1.0f, 1.0f, pulso), true);
-        DibujarTexto(hudShader, "1 2 3 - NIVEL    V - VENTISCA", 0.0f, SCREEN_HEIGHT - 120.0f * e, 3.0f * e, glm::vec4(1.0f, 0.95f, 0.85f, 0.85f), true);
+        DibujarTexto(hudShader, "V - VENTISCA", 0.0f, SCREEN_HEIGHT - 120.0f * e, 3.0f * e, glm::vec4(1.0f, 0.95f, 0.85f, 0.85f), true);
     }
 
     // Ayuda de controles al iniciar la carrera
@@ -1670,21 +1666,12 @@ void DibujarHUD(Shader& hudShader)
     if (aSalida > 0.0f)
         DibujarTexto(hudShader, "SALIDA!", 0.0f, SCREEN_HEIGHT * 0.30f, 10.0f * e, glm::vec4(0.35f, 1.0f, 0.45f, aSalida), true);
 
-    // Mensaje de cambio de nivel
-    float aNivel = AlphaMensaje(tiempoMensajeNivel, 0.8f, TIEMPO_MENSAJE_CORTO);
-    if (aNivel > 0.0f)
-        DibujarTexto(hudShader, NOMBRES_NIVEL[nivelActual], 0.0f, SCREEN_HEIGHT * 0.42f, 6.0f * e, glm::vec4(1.0f, 0.75f, 0.35f, aNivel), true);
-
     // Mensaje de ventisca
     float aVentisca = AlphaMensaje(tiempoMensajeVentisca, 0.8f, TIEMPO_MENSAJE_CORTO);
     if (aVentisca > 0.0f)
         DibujarTexto(hudShader, ventiscaActiva ? "VENTISCA ACTIVADA" : "VENTISCA DESACTIVADA", 0.0f, SCREEN_HEIGHT * 0.54f, 5.0f * e, glm::vec4(0.8f, 0.9f, 1.0f, aVentisca), true);
 
-    // Aviso de nivel bloqueado (al intentar cambiarlo durante la carrera)
-    float aBloqueo = AlphaMensaje(tiempoAvisoNivel, 0.8f, 0.8f);
-    if (aBloqueo > 0.0f)
-        DibujarTexto(hudShader, "NIVEL SOLO EN SALIDA", 0.0f, SCREEN_HEIGHT * 0.68f, 4.0f * e, glm::vec4(1.0f, 0.5f, 0.2f, aBloqueo), true);
-
+    
     // Aviso de choque con un obstáculo
     float aChoque = AlphaMensaje(tiempoAvisoChoque, 0.1f, 0.7f);
     if (aChoque > 0.0f && estadoCarrera == 1)
@@ -1878,20 +1865,12 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 
     // Niveles de dificultad y clima (la transición se interpola en ActualizarAmbiente)
    //xcc- selecciona dificultad y clima desde el Hub
-    if (action == GLFW_PRESS && key >= GLFW_KEY_1 && key <= GLFW_KEY_3)
+    if (action == GLFW_PRESS && key >= GLFW_KEY_1 && key <= GLFW_KEY_3 && escenaActual == ESCENA_HUB)
     {
-        if (escenaActual == ESCENA_HUB)
-        {
-            nivelActual = key - GLFW_KEY_1;
-            ajusteNieblaManual = 0.0f;
-
-            std::cout << "Seleccion en Hub: " << NOMBRES_NIVEL[nivelActual] << std::endl;
-        }
-        else if (escenaActual == ESCENA_PISTA)
-        {
-            //xcc- evita cambiar la dificultad desde la pista
-            tiempoAvisoNivel = glfwGetTime();
-        }
+        nivelActual = key - GLFW_KEY_1;
+        ajusteNieblaManual = 0.0f;
+        tiempoMensajeNivel = glfwGetTime();   // Dispara el mensaje en pantalla
+        std::cout << "Seleccion en Hub: " << NOMBRES_NIVEL[nivelActual] << std::endl;
     }
 }
 
