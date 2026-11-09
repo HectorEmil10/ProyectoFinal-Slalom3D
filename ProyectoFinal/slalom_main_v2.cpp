@@ -262,6 +262,16 @@ double tiempoMensajeVentisca  = -1.0;
 // ---- Dificultad / clima ----
 int nivelActual = 0;
 const char* NOMBRES_NIVEL[3] = { "NIVEL 1 - FACIL", "NIVEL 2 - MEDIO", "NIVEL 3 - DIFICIL" };
+//xcc- guarda la opcion de equipamiento elegida en el Hub
+int equipamientoSeleccionado = 0;
+
+const char* NOMBRES_EQUIPAMIENTO[3] = {
+    "OPCION 1",
+    "OPCION 2",
+    "OPCION 3"
+};
+
+
 
 //                                   vel   lat   niebla   sol   fov    vib   colorNiebla               colorSol                colorAmbiente
 const ParametrosAmbiente NIVELES[3] = {
@@ -372,6 +382,142 @@ static const Glifo GLIFOS[] = {
 // ---- Eventos de entrada ----
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode);
 void MouseCallback(GLFWwindow* window, double xPos, double yPos);
+
+//xcc- verifica la distancia al panel de configuracion
+bool CercaPanelConfiguracion()
+{
+    glm::vec3 posicionCamara = camera.GetPosition();
+
+    glm::vec2 posicionActual(posicionCamara.x, posicionCamara.z);
+
+    glm::vec2 posicionPanel(-13.1333f, -8.00144f);
+
+    float distancia = glm::length(posicionActual - posicionPanel);
+
+    return distancia < 5.0f;
+}
+
+//xcc- verifica si la camara esta cerca de la salida a pista
+bool CercaSalidaPista()
+{
+    glm::vec3 posicionCamara = camera.GetPosition();
+
+    return posicionCamara.z < -7.0f && posicionCamara.x > -7.0f && posicionCamara.x < 7.0f;
+}
+
+//xcc- verifica colisiones con los muebles del Hub
+bool ColisionMueblesHub(glm::vec3 posicion)
+{
+    //xcc-  mesa de la maqueta
+    if (posicion.x > -5.0f && posicion.x < 8.1f &&
+        posicion.z > -4.6f && posicion.z < 3.9f)
+    {
+        return true;
+    }
+
+    //xcc- mueble del lado izquierdo
+    if (posicion.x > -12.0f && posicion.x < -7.0f &&
+        posicion.z > 10.5f && posicion.z < 15.0f)
+    {
+        return true;
+    }
+
+    //xcc- mueble derecho 1
+    if (posicion.x > 6.0f && posicion.x < 9.5f &&
+        posicion.z > 9.0f && posicion.z < 12.5f)
+    {
+        return true;
+    }
+
+    //xcc- mueble derecho 2
+    if (posicion.x > 11.0f && posicion.x < 14.0f &&
+        posicion.z > 9.0f && posicion.z < 12.5f)
+    {
+        return true;
+    }
+
+    //xcc- mueble derecho 3
+    if (posicion.x > 14.5f && posicion.x < 17.5f &&
+        posicion.z > 8.5f && posicion.z < 12.0f)
+    {
+        return true;
+    }
+
+    //xcc- muebles pegados a la pared izquierda
+    if (posicion.x > -20.5f && posicion.x < -17.0f &&
+        posicion.z > -16.0f && posicion.z < -12.5f)
+    {
+        return true;
+    }
+
+    if (posicion.x > -20.5f && posicion.x < -17.0f &&
+        posicion.z > -7.5f && posicion.z < -4.5f)
+    {
+        return true;
+    }
+
+    if (posicion.x > -20.5f && posicion.x < -17.0f &&
+        posicion.z > -3.0f && posicion.z < 0.0f)
+    {
+        return true;
+    }
+
+    if (posicion.x > -20.5f && posicion.x < -17.0f &&
+        posicion.z > 4.5f && posicion.z < 8.0f)
+    {
+        return true;
+    }
+
+    //xcc- muebles pegados a las paredes
+    if (posicion.x > 17.0f && posicion.x < 20.5f &&
+        posicion.z > -15.0f && posicion.z < -11.5f)
+    {
+        return true;
+    }
+
+    if (posicion.x > 7.5f && posicion.x < 10.0f &&
+        posicion.z > -15.0f && posicion.z < -11.5f)
+    {
+        return true;
+    }
+
+    if (posicion.x > 5.5f && posicion.x < 8.0f &&
+        posicion.z > -15.0f && posicion.z < -11.5f)
+    {
+        return true;
+    }
+
+    if (posicion.x > -6.0f && posicion.x < -3.5f &&
+        posicion.z > -16.0f && posicion.z < -13.0f)
+    {
+        return true;
+    }
+
+
+    //xcc- colision con banca horizontal 1
+    if (posicion.x > -16.0f && posicion.x < -12.5f &&
+        posicion.z > 3.0f && posicion.z < 4.1f)
+    {
+        return true;
+    }
+
+    //xcc- colision con banca horizontal 2
+    if (posicion.x > -17.3f && posicion.x < -12.5f &&
+        posicion.z > -1.0f && posicion.z < 0.2f)
+    {
+        return true;
+    }
+
+    //xcc- colision con banca horizontal 3
+    if (posicion.x > -17.3f && posicion.x < -12.6f &&
+        posicion.z > -4.9f && posicion.z < -3.8f)
+    {
+        return true;
+    }
+
+    return false;
+}
+
 void DoMovement();
 
 // ---- Lógica del juego ----
@@ -382,6 +528,12 @@ void  ConstruirLimitesPista(Model& terreno);
 void  ConstruirColisionadores(Model& modelo);
 bool  ResolverColisiones(const glm::vec2& dirPista);
 float Suavizar(float actual, float objetivo, float tasa, float dt);
+//xcc- verifica si la camara esta cerca del panel
+bool CercaPanelConfiguracion();
+//xcc- verifica si la camara esta cerca de la salida
+bool CercaSalidaPista();
+//xcc- verifica colisiones con los muebles del Hub
+bool ColisionMueblesHub(glm::vec3 posicion);
 
 // ---- Ventisca ----
 void InicializarCopos();
@@ -527,13 +679,18 @@ int main()
 
         // ---- 6.7.2 Actualización lógica ----
         DoMovement();
-        ActualizarAmbiente(deltaTime);
-        ActualizarCarrera(PistaCompleta);
 
-        if (reconstruirLimites)
+        //xcc- actualiza la logica de carrera solo en la pista
+        if (escenaActual == ESCENA_PISTA)
         {
-            ConstruirLimitesPista(PistaCompleta);
-            reconstruirLimites = false;
+            ActualizarAmbiente(deltaTime);
+            ActualizarCarrera(PistaCompleta);
+
+            if (reconstruirLimites)
+            {
+                ConstruirLimitesPista(PistaCompleta);
+                reconstruirLimites = false;
+            }
         }
 
         // Velocidad normalizada (0..1): modula FOV, vibración de cámara y viento
@@ -658,15 +815,9 @@ int main()
         {
             colorShader.Use();
 
-            glUniformMatrix4fv(
-                glGetUniformLocation(colorShader.Program, "view"),
-                1, GL_FALSE, glm::value_ptr(view)
-            );
+            glUniformMatrix4fv( glGetUniformLocation(colorShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
 
-            glUniformMatrix4fv(
-                glGetUniformLocation(colorShader.Program, "projection"),
-                1, GL_FALSE, glm::value_ptr(projection)
-            );
+            glUniformMatrix4fv( glGetUniformLocation(colorShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
             GLint colorModelLoc = glGetUniformLocation(colorShader.Program, "model");
 
@@ -675,37 +826,15 @@ int main()
             // Postes de límite
             for (size_t i = 0; i < postesLimite.size(); i++)
             {
-                glm::mat4 modelPoste = glm::translate(
-                    glm::mat4(1.0f),
-                    postesLimite[i] + glm::vec3(
-                        0.0f,
-                        ALTURA_POSTE * 0.5f - DESFASE_POSTE,
-                        0.0f
-                    )
-                );
+                glm::mat4 modelPoste = glm::translate( glm::mat4(1.0f), postesLimite[i] + glm::vec3( 0.0f, ALTURA_POSTE * 0.5f - DESFASE_POSTE, 0.0f));
 
-                modelPoste = glm::scale(
-                    modelPoste,
-                    glm::vec3(0.6f, ALTURA_POSTE, 0.6f)
-                );
+                modelPoste = glm::scale( modelPoste, glm::vec3(0.6f, ALTURA_POSTE, 0.6f));
 
-                glUniformMatrix4fv(
-                    colorModelLoc,
-                    1,
-                    GL_FALSE,
-                    glm::value_ptr(modelPoste)
-                );
+                glUniformMatrix4fv( colorModelLoc, 1, GL_FALSE, glm::value_ptr(modelPoste));
 
-                glm::vec3 colorPoste =
-                    ((i / 2) % 2 == 0)
-                    ? glm::vec3(0.85f, 0.10f, 0.10f)
-                    : glm::vec3(0.95f, 0.95f, 0.95f);
+                glm::vec3 colorPoste = ((i / 2) % 2 == 0) ? glm::vec3(0.85f, 0.10f, 0.10f) : glm::vec3(0.95f, 0.95f, 0.95f);
 
-                glUniform3fv(
-                    colorShader.uniformColor,
-                    1,
-                    glm::value_ptr(colorPoste)
-                );
+                glUniform3fv( colorShader.uniformColor,  1, glm::value_ptr(colorPoste));
 
                 glDrawArrays(GL_TRIANGLES, 0, 36);
             }
@@ -804,15 +933,9 @@ int main()
         {
             colorShader.Use();
 
-            glUniformMatrix4fv(
-                glGetUniformLocation(colorShader.Program, "view"),
-                1, GL_FALSE, glm::value_ptr(view)
-            );
+            glUniformMatrix4fv( glGetUniformLocation(colorShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
 
-            glUniformMatrix4fv(
-                glGetUniformLocation(colorShader.Program, "projection"),
-                1, GL_FALSE, glm::value_ptr(projection)
-            );
+            glUniformMatrix4fv( glGetUniformLocation(colorShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
             GLint colorModelLoc = glGetUniformLocation(colorShader.Program, "model");
 
@@ -821,30 +944,15 @@ int main()
             glm::mat4 sueloHub = glm::mat4(1.0f);
 
             //xcc- nieve debajo del Hub
-            sueloHub = glm::translate(
-                sueloHub,
-                glm::vec3(0.0f, -0.11f, 0.0f)
-            );
+            sueloHub = glm::translate(sueloHub, glm::vec3(0.0f, -0.11f, 0.0f));
 
-            sueloHub = glm::scale(
-                sueloHub,
-                glm::vec3(500.0f, 0.10f, 500.0f)
-            );
+            sueloHub = glm::scale( sueloHub, glm::vec3(500.0f, 0.10f, 500.0f));
 
-            glUniformMatrix4fv(
-                colorModelLoc,
-                1,
-                GL_FALSE,
-                glm::value_ptr(sueloHub)
-            );
+            glUniformMatrix4fv( colorModelLoc, 1, GL_FALSE, glm::value_ptr(sueloHub));
 
             glm::vec3 colorNieve(0.90f, 0.94f, 1.0f);
 
-            glUniform3fv(
-                colorShader.uniformColor,
-                1,
-                glm::value_ptr(colorNieve)
-            );
+            glUniform3fv(colorShader.uniformColor, 1, glm::value_ptr(colorNieve));
 
             glDrawArrays(GL_TRIANGLES, 0, 36);
 
@@ -1618,13 +1726,29 @@ void DibujarHUDHub(Shader& hudShader)
 
     float e = SCREEN_HEIGHT / 800.0f;
 
-    //xcc- instrucciones de seleccion
-    DibujarTexto( hudShader, "SELECCIONA DIFICULTAD: 1 2 3", 20.0f * e, 20.0f * e, 3.0f * e, glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), false);
+    if (CercaPanelConfiguracion())
+    {
+        //xcc- instrucciones de seleccion
+        DibujarTexto(hudShader, "SELECCIONA DIFICULTAD: 1 2 3", 20.0f * e, 20.0f * e, 3.0f * e, glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), false);
 
-    //xcc- muestra la opcion actual
-    DibujarTexto( hudShader, NOMBRES_NIVEL[nivelActual], 20.0f * e, 60.0f * e, 3.0f * e, glm::vec4(1.0f, 0.85f, 0.4f, 1.0f), false);
+        //xcc- muestra la opcion actual
+        DibujarTexto(hudShader, NOMBRES_NIVEL[nivelActual], 20.0f * e, 60.0f * e, 3.0f * e, glm::vec4(1.0f, 0.85f, 0.4f, 1.0f), false);
 
-    glEnable(GL_DEPTH_TEST);
+        //xcc- muestra las opciones de equipamiento
+        DibujarTexto( hudShader, "EQUIPAMIENTO: 4 5 6", 20.0f * e, 100.0f * e, 3.0f * e, glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), false);
+
+        //xcc- muestra el equipamiento actual
+        DibujarTexto( hudShader, NOMBRES_EQUIPAMIENTO[equipamientoSeleccionado], 20.0f * e, 140.0f * e, 3.0f * e, glm::vec4(1.0f, 0.85f, 0.4f, 1.0f),false);
+    }
+
+    //xcc- muestra aviso cerca de la salida a pista
+    if (CercaSalidaPista())
+    {
+        DibujarTexto( hudShader, "PRESIONA E PARA IR A PISTA",0.0f, SCREEN_HEIGHT - 70.0f * e, 3.0f * e, glm::vec4(0.0, 0.0, 0.0, 1.0f), true);
+    }
+
+        glEnable(GL_DEPTH_TEST);
+   
 }
 
 void DibujarHUD(Shader& hudShader)
@@ -1755,6 +1879,13 @@ void DoMovement()
                 }
             }
 
+            //xcc- evita atravesar los muebles del Hub
+            if (ColisionMueblesHub(posicionCamara))
+            {
+                posicionCamara = posicionAnterior;
+                posicionCamara.y = 3.0f;
+            }
+
             camera.SetPosition(posicionCamara);
         }
     }
@@ -1782,25 +1913,18 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 
 
     //xcc- cambia del Hub a la pista cerca de la salida donde dice "pista"
-    if (key == GLFW_KEY_E && action == GLFW_PRESS && escenaActual == ESCENA_HUB)
+    if (key == GLFW_KEY_E && action == GLFW_PRESS && escenaActual == ESCENA_HUB && CercaSalidaPista())
     {
-        glm::vec3 posicionCamara = camera.GetPosition();
+        escenaActual = ESCENA_PISTA;
+        modoCamara = 1;
 
-        //xcc- zona de salida trasera del Hub
-        if (posicionCamara.z < -12.0f &&
-            posicionCamara.x > -5.0f &&
-            posicionCamara.x < 5.0f)
-        {
-            escenaActual = ESCENA_PISTA;
-            modoCamara = 1;
+        skierPos = posSalida;
+        estadoCarrera = 0;
+        velActual = 0.0f;
 
-            skierPos = posSalida;
-            estadoCarrera = 0;
-            velActual = 0.0f;
-
-            std::cout << "Cambio de escena: Hub -> Pista" << std::endl;
-        }
+        std::cout << "Cambio de escena: Hub -> Pista" << std::endl;
     }
+
 
     // Cambio de cámara
     if (key == GLFW_KEY_C && action == GLFW_PRESS)
@@ -1880,7 +2004,8 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
    //xcc- selecciona dificultad y clima desde el Hub
     if (action == GLFW_PRESS && key >= GLFW_KEY_1 && key <= GLFW_KEY_3)
     {
-        if (escenaActual == ESCENA_HUB)
+        //xcc- permite seleccionar solo cerca del panel
+        if (escenaActual == ESCENA_HUB && CercaPanelConfiguracion())
         {
             nivelActual = key - GLFW_KEY_1;
             ajusteNieblaManual = 0.0f;
@@ -1892,6 +2017,14 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
             //xcc- evita cambiar la dificultad desde la pista
             tiempoAvisoNivel = glfwGetTime();
         }
+    }
+
+    //xcc- selecciona equipamiento desde el panel del Hub
+    if (action == GLFW_PRESS && key >= GLFW_KEY_4 && key <= GLFW_KEY_6 && escenaActual == ESCENA_HUB && CercaPanelConfiguracion())
+    {
+        equipamientoSeleccionado = key - GLFW_KEY_4;
+
+        std::cout << "Equipamiento seleccionado: " << NOMBRES_EQUIPAMIENTO[equipamientoSeleccionado] << std::endl; //solamente funcionará cuando este cerca del panel.
     }
 }
 
