@@ -78,6 +78,7 @@
 #include "Camera.h"
 #include "Model.h"
 #include "Iluminacion.h"
+#include "stb_image.h"
 
 // ============================================================================
 //  ETAPA 2. CONSTANTES DE CONFIGURACIÓN
@@ -266,6 +267,12 @@ double tiempoAvisoChoque      = -1.0;
 double tiempoAyudaControles   = -1.0;
 double tiempoMensajeVentisca  = -1.0;
 
+// ---- Variables de animación ----
+float tiempoAnim = 0.0f;
+float oscilacionPiernas = 0.0f;
+float inclinacionLateral = 0.0f;
+float inclinacionTorso = 0.0f;
+
 // ---- Dificultad / clima ----
 int nivelActual = 0;
 const char* NOMBRES_NIVEL[3] = { "NIVEL 1 - FACIL", "NIVEL 2 - MEDIO", "NIVEL 3 - DIFICIL" };
@@ -278,7 +285,9 @@ const char* NOMBRES_EQUIPAMIENTO[3] = {
     "OPCION 3"
 };
 
-
+// Vector para almacenar las texturas disponibles
+std::vector<GLuint> opcionesTrajes;
+int indiceTrajeActual = 0; // 0 = Turquesa, 1 = Rojo
 
 //                                   vel   lat   niebla   sol   fov    vib   colorNiebla               colorSol                colorAmbiente
 const ParametrosAmbiente NIVELES[3] = {
@@ -394,13 +403,9 @@ void MouseCallback(GLFWwindow* window, double xPos, double yPos);
 bool CercaPanelConfiguracion()
 {
     glm::vec3 posicionCamara = camera.GetPosition();
-
     glm::vec2 posicionActual(posicionCamara.x, posicionCamara.z);
-
     glm::vec2 posicionPanel(-13.1333f, -8.00144f);
-
     float distancia = glm::length(posicionActual - posicionPanel);
-
     return distancia < 5.0f;
 }
 
@@ -580,6 +585,44 @@ bool CercaSalidaPista();
 //xcc- verifica colisiones con los muebles del Hub
 bool ColisionMueblesHub(glm::vec3 posicion);
 
+GLuint CargarTextura(const char* rutaArchivo)
+{
+    GLuint textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+
+    // Configuración de wrapping y filtros
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    int textureWidth, textureHeight, nrChannels;
+    //stbi_set_flip_vertically_on_load(true);
+    unsigned char* image = stbi_load(rutaArchivo, &textureWidth, &textureHeight, &nrChannels, 0);
+
+    if (image)
+    {
+        // Detectar automáticamente si es RGB o RGBA (por si el PNG tiene transparencia)
+        GLenum format = GL_RGB;
+        if (nrChannels == 4)
+            format = GL_RGBA;
+        else if (nrChannels == 1)
+            format = GL_RED;
+
+        glTexImage2D(GL_TEXTURE_2D, 0, format, textureWidth, textureHeight, 0, format, GL_UNSIGNED_BYTE, image);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+    else
+    {
+        std::cout << "Error: No se pudo cargar la textura en la ruta: " << rutaArchivo << std::endl;
+    }
+
+    stbi_image_free(image);
+    return textureID;
+}
+
+
 // ---- Ventisca ----
 void InicializarCopos();
 void ActualizarVentisca(float dt, float velNorm);
@@ -689,6 +732,35 @@ int main()
     Model PistaCompleta((char*)"Models/Entorno/pista.obj");
     Model HubCentral((char*)"Models/Hub/Hub_central.obj"); //xcc
 
+    // Cargar las opciones de trajes para el sistema de personalización
+    GLuint texTrajeTurquesa = CargarTextura("images/traje_turquesa.png");
+    GLuint texTrajeRojo = CargarTextura("images/traje_rojo.png");
+    // Llenar el vector global
+    opcionesTrajes.push_back(texTrajeTurquesa);
+    opcionesTrajes.push_back(texTrajeRojo);
+
+    Model PechoModel((char*)"Models/Esquiador/pecho.obj");
+    Model CaderasModel((char*)"Models/Esquiador/caderas.obj");
+    Model CinturaModel((char*)"Models/Esquiador/cintura.obj");
+    Model CuelloModel((char*)"Models/Esquiador/cuello.obj");
+    Model CabezaModel((char*)"Models/Esquiador/cabeza.obj");
+
+    Model HombroDerModel((char*)"Models/Esquiador/hombro_der.obj");
+    Model HombroIzqModel((char*)"Models/Esquiador/hombro_izq.obj");
+    Model BrazoDerModel((char*)"Models/Esquiador/brazo_der.obj");
+    Model BrazoIzqModel((char*)"Models/Esquiador/brazo_izq.obj");
+    Model AntebrazoDerModel((char*)"Models/Esquiador/antebrazo_der.obj");
+    Model AntebrazoIzqModel((char*)"Models/Esquiador/antebrazo_izq.obj");
+    Model ManoDerModel((char*)"Models/Esquiador/mano_der.obj");
+    Model ManoIzqModel((char*)"Models/Esquiador/mano_izq.obj");
+
+    Model PiernaSupDerModel((char*)"Models/Esquiador/pierna_sup_der.obj");
+    Model PiernaSupIzqModel((char*)"Models/Esquiador/pierna_sup_izq.obj");
+    Model PiernaInfDerModel((char*)"Models/Esquiador/pierna_inf_der.obj");
+    Model PiernaInfIzqModel((char*)"Models/Esquiador/pierna_inf_izq.obj");
+    Model PieDerModel((char*)"Models/Esquiador/pie_der.obj");
+    Model PieIzqModel((char*)"Models/Esquiador/pie_izq.obj");
+
     GLuint texturaSkybox = CargarSkybox(CARAS_SKYBOX);
     bool hayTexturaSkybox = (texturaSkybox != 0);
     if (!hayTexturaSkybox)
@@ -709,6 +781,7 @@ int main()
 
     // Copos de nieve para la ventisca
     InicializarCopos();
+
 
     // ------------------------------------------------------------------------
     //  6.7 CICLO PRINCIPAL (GAME LOOP)
@@ -882,14 +955,7 @@ int main()
 
                     float alto = o.yMax - o.yMin;
 
-                    glm::mat4 modelCol = glm::translate(
-                        glm::mat4(1.0f),
-                        glm::vec3(
-                            o.centro.x,
-                            o.yMin + alto * 0.5f,
-                            o.centro.z
-                        )
-                    );
+                    glm::mat4 modelCol = glm::translate( glm::mat4(1.0f), glm::vec3(  o.centro.x, o.yMin + alto * 0.5f,  o.centro.z) );
 
                     modelCol = glm::scale(
                         modelCol,
@@ -924,39 +990,147 @@ int main()
                 glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
             }
 
+            /*
             // Nodo raíz temporal del esquiador
             glm::mat4 modelTemp = glm::mat4(1.0f);
             modelTemp = glm::translate(modelTemp, skierPos);
-
-            modelTemp = glm::rotate(
-                modelTemp,
-                glm::radians(skierRotY),
-                glm::vec3(0.0f, 1.0f, 0.0f)
-            );
-
-            glm::mat4 modelIndicador = glm::scale(
-                modelTemp,
-                glm::vec3(1.5f, 3.0f, 1.5f)
-            );
-
-            glUniformMatrix4fv(
-                colorModelLoc,
-                1,
-                GL_FALSE,
-                glm::value_ptr(modelIndicador)
-            );
-
+            modelTemp = glm::rotate( modelTemp, glm::radians(skierRotY), glm::vec3(0.0f, 1.0f, 0.0f));
+            glm::mat4 modelIndicador = glm::scale( modelTemp, glm::vec3(1.5f, 3.0f, 1.5f) );
+            glUniformMatrix4fv( colorModelLoc, 1, GL_FALSE, glm::value_ptr(modelIndicador));
             glm::vec3 colorNaranja(1.0f, 0.35f, 0.0f);
-
-            glUniform3fv(
-                colorShader.uniformColor,
-                1,
-                glm::value_ptr(colorNaranja)
-            );
-
+            glUniform3fv(colorShader.uniformColor,1,glm::value_ptr(colorNaranja));
             glDrawArrays(GL_TRIANGLES, 0, 36);
-
             glBindVertexArray(0);
+            */
+
+            GLint modelLoc = glGetUniformLocation(lightingShader.Program, "model");
+
+            lightingShader.Use();
+            glUniform1i(glGetUniformLocation(lightingShader.Program, "transparency"), 0);
+            glUniform2f(glGetUniformLocation(lightingShader.Program, "uvOffset"), 0.0f, 0.0f);
+
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, opcionesTrajes[indiceTrajeActual]);
+            glUniform1i(glGetUniformLocation(lightingShader.Program, "texture_diffuse1"), 0);
+
+            glm::mat4 modelSkier = glm::mat4(1.0f);
+            modelSkier = glm::translate(modelSkier, skierPos);
+            modelSkier = glm::rotate(modelSkier, glm::radians(skierRotY), glm::vec3(0.0f, 1.0f, 0.0f));
+
+            // --- TREN INFERIOR ---
+                  // Caderas
+            glm::mat4 modelCaderas = modelSkier;
+            modelCaderas = glm::translate(modelCaderas, glm::vec3(0.0f, -0.9f, 0.0f));
+            modelCaderas = glm::rotate(modelCaderas, glm::radians(inclinacionLateral), glm::vec3(0.0f, 0.0f, 1.0f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelCaderas));
+            CaderasModel.Draw(lightingShader);
+
+            // Pierna Superior Izquierda
+            glm::mat4 modelPiernaSupIzq = modelCaderas;
+            modelPiernaSupIzq = glm::translate(modelPiernaSupIzq, glm::vec3(-0.35f, -0.04f, 0.0f));
+            modelPiernaSupIzq = glm::rotate(modelPiernaSupIzq, glm::radians(oscilacionPiernas), glm::vec3(1.0f, 0.0f, 0.0f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPiernaSupIzq));
+            PiernaSupIzqModel.Draw(lightingShader);
+
+            // Pierna Inferior Izquierda (Hija de la sup)
+            glm::mat4 modelPiernaInfIzq = modelPiernaSupIzq;
+            modelPiernaInfIzq = glm::translate(modelPiernaInfIzq, glm::vec3(0.0f, -0.04f, 0.0f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPiernaInfIzq));
+            PiernaInfIzqModel.Draw(lightingShader);
+
+            // Pie Izquierdo (Hijo de la inf)
+            glm::mat4 modelPieIzq = modelPiernaInfIzq;
+            modelPieIzq = glm::translate(modelPieIzq, glm::vec3(0.0f, -0.04f, 0.0f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPieIzq));
+            PieIzqModel.Draw(lightingShader);
+
+            // Pierna Superior Derecha
+            glm::mat4 modelPiernaSupDer = modelCaderas;
+            modelPiernaSupDer = glm::translate(modelPiernaSupDer, glm::vec3(0.35f, -0.04f, 0.0f));
+            modelPiernaSupDer = glm::rotate(modelPiernaSupDer, glm::radians(-oscilacionPiernas), glm::vec3(1.0f, 0.0f, 0.0f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPiernaSupDer));
+            PiernaSupDerModel.Draw(lightingShader);
+
+            // Pierna Inferior Derecha
+            glm::mat4 modelPiernaInfDer = modelPiernaSupDer;
+            modelPiernaInfDer = glm::translate(modelPiernaInfDer, glm::vec3(0.0f, -0.04f, 0.0f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPiernaInfDer));
+            PiernaInfDerModel.Draw(lightingShader);
+
+            // Pie Derecho
+            glm::mat4 modelPieDer = modelPiernaInfDer;
+            modelPieDer = glm::translate(modelPieDer, glm::vec3(0.0f, -0.04f, 0.0f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPieDer));
+            PieDerModel.Draw(lightingShader);
+
+
+            // --- TREN SUPERIOR ---
+            // Cintura y Pecho
+            glm::mat4 modelCintura = modelCaderas;
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelCintura));
+            CinturaModel.Draw(lightingShader);
+
+            glm::mat4 modelPecho = modelCintura;
+            modelPecho = glm::translate(modelPecho, glm::vec3(0.0f, 0.04f, 0.0f));
+            modelPecho = glm::rotate(modelPecho, glm::radians(inclinacionTorso), glm::vec3(1.0f, 0.0f, 0.0f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPecho));
+            PechoModel.Draw(lightingShader);
+
+            // Cuello y Cabeza
+            glm::mat4 modelCuello = modelPecho;
+            modelCuello = glm::translate(modelCuello, glm::vec3(0.0f, 0.04f, 0.0f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelCuello));
+            CuelloModel.Draw(lightingShader);
+
+            glm::mat4 modelCabeza = modelCuello;
+            modelCabeza = glm::translate(modelCabeza, glm::vec3(0.0f, 0.1f, 0.0f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelCabeza));
+            CabezaModel.Draw(lightingShader);
+
+
+            // --- BRAZOS Y MANOS ---
+            // Hombro y Brazo Izquierdo
+            glm::mat4 modelHombroIzq = modelPecho;
+            modelHombroIzq = glm::translate(modelHombroIzq, glm::vec3(-0.08f, -0.1f, 0.0f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelHombroIzq));
+            HombroIzqModel.Draw(lightingShader);
+
+            glm::mat4 modelBrazoIzq = modelHombroIzq;
+            //modelBrazoIzq = glm::rotate(modelBrazoIzq, glm::radians(factorOscilacion), glm::vec3(1.0f, 0.0f, 0.0f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelBrazoIzq));
+            BrazoIzqModel.Draw(lightingShader);
+
+            glm::mat4 modelAntebrazoIzq = modelBrazoIzq;
+            modelAntebrazoIzq = glm::translate(modelAntebrazoIzq, glm::vec3(0.0f, -0.009f, 0.0f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelAntebrazoIzq));
+            AntebrazoIzqModel.Draw(lightingShader);
+
+            glm::mat4 modelManoIzq = modelAntebrazoIzq;
+            modelManoIzq = glm::translate(modelManoIzq, glm::vec3(0.0f, 0.01f, 0.0f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelManoIzq));
+            ManoIzqModel.Draw(lightingShader);
+
+
+            // Hombro y Brazo Derecho
+            glm::mat4 modelHombroDer = modelPecho;
+            modelHombroDer = glm::translate(modelHombroDer, glm::vec3(0.08f, -0.1f, 0.0f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelHombroDer));
+            HombroDerModel.Draw(lightingShader);
+
+            glm::mat4 modelBrazoDer = modelHombroDer;
+            //modelBrazoDer = glm::rotate(modelBrazoDer, glm::radians(-factorOscilacion), glm::vec3(1.0f, 0.0f, 0.0f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelBrazoDer));
+            BrazoDerModel.Draw(lightingShader);
+
+            glm::mat4 modelAntebrazoDer = modelBrazoDer;
+            modelAntebrazoDer = glm::translate(modelAntebrazoDer, glm::vec3(0.0f, -0.009f, 0.0f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelAntebrazoDer));
+            AntebrazoDerModel.Draw(lightingShader);
+
+            glm::mat4 modelManoDer = modelAntebrazoDer;
+            modelManoDer = glm::translate(modelManoDer, glm::vec3(0.0f, 0.01f, 0.0f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelManoDer));
+            ManoDerModel.Draw(lightingShader);
         }
 
 
@@ -964,15 +1138,10 @@ int main()
         if (escenaActual == ESCENA_HUB)
         {
             colorShader.Use();
-
             glUniformMatrix4fv( glGetUniformLocation(colorShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
-
             glUniformMatrix4fv( glGetUniformLocation(colorShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-
             GLint colorModelLoc = glGetUniformLocation(colorShader.Program, "model");
-
             glBindVertexArray(VAO);
-
             glm::mat4 sueloHub = glm::mat4(1.0f);
 
             //xcc- nieve debajo del Hub
@@ -1926,6 +2095,24 @@ void DoMovement()
         }
     }
 
+    // --- CÁLCULO DE ANIMACIONES DEL ESQUIADOR ---
+    if (estadoCarrera == 1) {
+        tiempoAnim += deltaTime * (velActual * 0.2f);
+        oscilacionPiernas = std::sin(tiempoAnim * 15.0f) * (12.0f * (velActual / ambienteActual.velocidadDescenso));
+    }
+    else {
+        oscilacionPiernas = 0.0f;
+    }
+
+    float objetivoInclinacionLat = 0.0f;
+    if (keys[GLFW_KEY_D] || keys[GLFW_KEY_RIGHT]) objetivoInclinacionLat = 18.0f;
+    if (keys[GLFW_KEY_A] || keys[GLFW_KEY_LEFT])  objetivoInclinacionLat = -18.0f;
+    inclinacionLateral = Suavizar(inclinacionLateral, objetivoInclinacionLat, 10.0f, deltaTime);
+
+    float objetivoInclinacionTorso = 0.0f;
+    if (keys[GLFW_KEY_W] || keys[GLFW_KEY_UP])     objetivoInclinacionTorso = 8.0f;
+    if (keys[GLFW_KEY_S] || keys[GLFW_KEY_DOWN])  objetivoInclinacionTorso = -10.0f;
+    inclinacionTorso = Suavizar(inclinacionTorso, objetivoInclinacionTorso, 8.0f, deltaTime);
     // Niebla manual: se suma al valor del nivel (limitada en el render)
     if (keys[GLFW_KEY_N])
         ajusteNieblaManual = glm::min(ajusteNieblaManual + 0.00005f, 0.02f);
@@ -1947,6 +2134,11 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         else if (action == GLFW_RELEASE) keys[key] = false;
     }
 
+    if (key == GLFW_KEY_E && action == GLFW_PRESS)
+    {
+        indiceTrajeActual = (indiceTrajeActual + 1) % opcionesTrajes.size();
+        std::cout << ">>> ¡Cambiando de atuendo! Índice actual: " << indiceTrajeActual << std::endl;
+    }
 
     //xcc- cambia del Hub a la pista cerca de la salida donde dice "pista"
     if (key == GLFW_KEY_E && action == GLFW_PRESS && escenaActual == ESCENA_HUB && CercaSalidaPista())
