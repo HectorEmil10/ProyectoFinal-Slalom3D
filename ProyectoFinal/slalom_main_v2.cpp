@@ -126,12 +126,12 @@ const float TIEMPO_MENSAJE_CORTO = 1.5f;    // Mensajes breves (salida, cambio d
 // ---- Cielo ----
 // Orden de caras del cubemap: +X, -X, +Y, -Y, +Z, -Z
 const char* CARAS_SKYBOX[6] = {
-    "Textures/skybox/tile-r02-c02.png",
-    "Textures/skybox/tile-r02-c03.png",
-    "Textures/skybox/tile-r01-c02.png",
-    "Textures/skybox/tile-r02-c01.png",
-    "Textures/skybox/tile-r01-c01.png",
-    "Textures/skybox/tile-r01-c03.png"
+    "Textures/skybox/tile-r02-c02.png", //top
+    "Textures/skybox/tile-r01-c03.png", // front b
+    "Textures/skybox/tile-r02-c01.png", // back
+    "Textures/skybox/tile-r01-c01.png", //down b
+    "Textures/skybox/tile-r01-c02.png", //der
+    "Textures/skybox/tile-r02-c03.png"  //izq b
 };
 
 // ============================================================================
