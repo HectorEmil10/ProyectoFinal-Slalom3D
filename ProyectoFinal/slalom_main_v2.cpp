@@ -224,8 +224,7 @@ float factorInteriorHub = 0.0f;   // 0 = afuera del Hub, 1 = adentro (suavizado)
 int modoCamara = 0;                                   // 0 = inspección, 1 = tercera persona
 //Camera camera(glm::vec3(-255.0f, 52.0f, 36.0f));  
 
-//xcc- camara inicial frente al Hub
-//Camera camera(glm::vec3(0.0f, 3.0f, 30.0f));
+
 
 
 
@@ -577,6 +576,144 @@ bool ColisionMueblesHub(glm::vec3 posicion)
         return true;
     }
 
+
+    return false;
+}
+
+//xcc- verifica los limites del exterior del Hub
+bool ColisionExteriorHub(glm::vec3 posicion)
+{
+    float linea;
+
+    //xcc- limite derecho
+    if (posicion.z > 21.0f && posicion.z < 40.6f)
+    {
+        linea = -0.0171f * posicion.z + 46.013f;
+        if (posicion.x > linea - 1.0f && posicion.x < linea + 1.0f)
+            return true;
+    }
+
+    //xcc- limite superior derecho
+    if (posicion.x > 24.27f && posicion.x < 45.57f)
+    {
+        linea = -0.0148f * posicion.x + 41.475f;
+        if (posicion.z > linea - 1.0f && posicion.z < linea + 1.0f)
+            return true;
+    }
+
+    //xcc- limite diagonal derecho
+    if (posicion.x > 12.58f && posicion.x < 24.26f)
+    {
+        linea = -2.2274f * posicion.x + 95.734f;
+        if (posicion.z > linea - 1.0f && posicion.z < linea + 1.0f)
+            return true;
+    }
+
+    //xcc- limite superior
+    if (posicion.x > -9.78f && posicion.x < 12.43f)
+    {
+        linea = 0.0138f * posicion.x + 68.184f;
+        if (posicion.z > linea - 1.0f && posicion.z < linea + 1.0f)
+            return true;
+    }
+
+    //xcc- limite diagonal izquierdo
+    if (posicion.x > -21.57f && posicion.x < -10.53f)
+    {
+        linea = 2.4600f * posicion.x + 93.940f;
+        if (posicion.z > linea - 1.0f && posicion.z < linea + 1.0f)
+            return true;
+    }
+
+    //xcc- limite superior izquierdo
+    if (posicion.x > -41.38f && posicion.x < -22.16f)
+    {
+        linea = 0.0068f * posicion.x + 40.814f;
+        if (posicion.z > linea - 1.0f && posicion.z < linea + 1.0f)
+            return true;
+    }
+
+    //xcc- limite izquierdo
+    if (posicion.z > 21.02f && posicion.z < 38.86f)
+    {
+        linea = 0.1248f * posicion.z - 46.219f;
+        if (posicion.x > linea - 1.0f && posicion.x < linea + 1.0f)
+            return true;
+    }
+
+    //xcc- colision con la cerca superior
+    if (posicion.x > -16.94f && posicion.x < 17.23f)
+    {
+        linea = 0.0630f * posicion.x + 69.144f;
+
+        if (posicion.z > linea - 1.0f && posicion.z < linea + 1.0f)
+            return true;
+    }
+
+    //xcc- colision con roca o arbol exterior 1
+    if (posicion.x > -6.7f && posicion.x < -3.7f &&
+        posicion.z > 50.1f && posicion.z < 53.1f) return true;
+
+    //xcc- colision con roca o arbol exterior 2
+    if (posicion.x > 8.2f && posicion.x < 11.2f &&
+        posicion.z > 40.3f && posicion.z < 43.3f) return true;
+
+    //xcc- colision con roca o arbol exterior 3
+    if (posicion.x > 11.7f && posicion.x < 14.7f &&
+        posicion.z > 37.5f && posicion.z < 40.5f) return true;
+
+    //xcc- colision con roca o arbol exterior 4
+    if (posicion.x > 13.1f && posicion.x < 16.1f &&
+        posicion.z > 40.3f && posicion.z < 43.3f) return true;
+
+    //xcc- colision con roca o arbol exterior 5
+    if (posicion.x > 18.0f && posicion.x < 21.0f &&
+        posicion.z > 39.6f && posicion.z < 42.6f) return true;
+
+    //xcc- colision con roca o arbol exterior 6
+    if (posicion.x > 22.7f && posicion.x < 25.7f &&
+        posicion.z > 35.9f && posicion.z < 38.9f) return true;
+
+    //xcc- colision con roca o arbol exterior 7
+    if (posicion.x > 28.1f && posicion.x < 31.1f &&
+        posicion.z > 33.3f && posicion.z < 36.3f) return true;
+
+    //xcc- colision con roca o arbol exterior 8
+    if (posicion.x > 32.4f && posicion.x < 35.4f &&
+        posicion.z > 28.7f && posicion.z < 31.7f) return true;
+
+    //xcc- colision con roca o arbol exterior 9
+    if (posicion.x > 17.9f && posicion.x < 20.9f &&
+        posicion.z > 38.8f && posicion.z < 41.8f) return true;
+
+    //xcc- colision con roca o arbol exterior 10
+    if (posicion.x > 6.9f && posicion.x < 9.9f &&
+        posicion.z > 39.3f && posicion.z < 42.3f) return true;
+
+    //xcc- colision con roca o arbol exterior 11
+    if (posicion.x > 5.3f && posicion.x < 8.3f &&
+        posicion.z > 36.5f && posicion.z < 39.5f) return true;
+
+    //xcc- colision con roca o arbol exterior 12
+    if (posicion.x > -8.2f && posicion.x < -5.2f &&
+        posicion.z > 39.5f && posicion.z < 42.5f) return true;
+
+    //xcc- colision con roca o arbol exterior 13
+    if (posicion.x > -13.2f && posicion.x < -10.2f &&
+        posicion.z > 39.0f && posicion.z < 42.0f) return true;
+
+    //xcc- colision con roca o arbol exterior 14
+    if (posicion.x > -14.4f && posicion.x < -11.4f &&
+        posicion.z > 32.7f && posicion.z < 35.7f) return true;
+
+    //xcc- colision con roca o arbol exterior 15
+    if (posicion.x > -22.7f && posicion.x < -19.7f &&
+        posicion.z > 32.9f && posicion.z < 35.9f) return true;
+
+    //xcc- colision con roca o arbol exterior 16
+    if (posicion.x > -31.6f && posicion.x < -28.6f &&
+        posicion.z > 29.7f && posicion.z < 32.7f) return true;
+
     return false;
 }
 
@@ -630,6 +767,50 @@ bool ColisionMueblesTrofeos(glm::vec3 posicion)
     //xcc- colision con planta derecha
     if (posicion.x > 3.3f && posicion.x < 4.2f &&
         posicion.z > -0.65f && posicion.z < 0.25f)
+    {
+        return true;
+    }
+
+    //xcc- colision con repisa de la parte nueva
+    if (posicion.x > 3.75f && posicion.x < 5.62f &&
+        posicion.z > 11.20f && posicion.z < 11.68f)
+    {
+        return true;
+    }
+
+    //xcc- colision con silla o mesa nueva 1
+    if (posicion.x > -5.62f && posicion.x < -4.57f &&
+        posicion.z > 9.61f && posicion.z < 10.61f) return true;
+
+    //xcc- colision con silla o mesa nueva 2
+    if (posicion.x > -4.70f && posicion.x < -3.35f &&
+        posicion.z > 8.82f && posicion.z < 9.39f) return true;
+
+    //xcc- colision con silla o mesa nueva 3
+    if (posicion.x > -3.40f && posicion.x < -2.09f &&
+        posicion.z > 9.85f && posicion.z < 10.77f) return true;
+
+    //xcc- colision con silla o mesa nueva 4
+    if (posicion.x > 4.97f && posicion.x < 5.70f &&
+        posicion.z > 4.86f && posicion.z < 6.11f) return true;
+
+    //xcc- colision con planta nueva izquierda
+    if (posicion.x > -5.7f && posicion.x < -4.8f &&
+        posicion.z > 10.7f && posicion.z < 11.65f)
+    {
+        return true;
+    }
+
+    //xcc- colision con planta nueva derecha
+    if (posicion.x > 2.6f && posicion.x < 3.5f &&
+        posicion.z > 10.8f && posicion.z < 11.65f)
+    {
+        return true;
+    }
+
+    //xcc- colision con mesa nueva derecha
+    if (posicion.x > 5.05f && posicion.x < 5.70f &&
+        posicion.z > 4.85f && posicion.z < 6.21f)
     {
         return true;
     }
@@ -720,9 +901,7 @@ int main()
     glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     glEnable(GL_DEPTH_TEST);
 
-    //xcc- activa transparencias para vidrios y vitrinas
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 
 
 
@@ -774,8 +953,12 @@ int main()
     // ------------------------------------------------------------------------
     Model PistaCompleta((char*)"Models/Entorno/pista.obj");
     Model HubCentral((char*)"Models/Hub/Hub_central.obj"); //xcc
+    //xcc- carga los elementos exteriores del Hub
+    Model HubExterior((char*)"Models/Hub/Exterior.obj");
     //xcc- carga la sala de trofeos
     Model SalaTrofeos((char*)"Models/Trofeos/Sala_Trofeos.obj");
+    //xcc- carga la parte nueva de la sala de trofeos
+    Model SalaTrofeosNueva((char*)"Models/Trofeos/Sala_Trofeos_parte_nueva.obj");
 
     GLuint texturaSkybox = CargarSkybox(CARAS_SKYBOX);
     bool hayTexturaSkybox = (texturaSkybox != 0);
@@ -921,6 +1104,9 @@ int main()
         if (escenaActual == ESCENA_HUB)
         {
             HubCentral.Draw(lightingShader);
+
+            //xcc- dibuja el exterior del Hub
+            HubExterior.Draw(lightingShader);
         }
         else if (escenaActual == ESCENA_PISTA)//xcc
         {
@@ -940,8 +1126,42 @@ int main()
                 0.75f, 0.70f, 0.65f
             );
 
+
+            //xcc- usa dos luces puntuales dentro de trofeos
+            glUniform1i(glGetUniformLocation(lightingShader.Program, "numPointLights"), 2);
+
+            //xcc- luz izquierda
+            glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].position"), -3.0f, 3.5f, 0.0f);
+            glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].ambient"), 0.15f, 0.12f, 0.08f);
+            glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].diffuse"), 0.85f, 0.65f, 0.45f);
+            glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].specular"), 1.0f, 0.85f, 0.65f);
+            glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[0].constant"), 1.0f);
+            glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[0].linear"), 0.09f);
+            glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[0].quadratic"), 0.032f);
+
+            //xcc- luz derecha
+            glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[1].position"), 3.0f, 3.5f, 0.0f);
+            glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[1].ambient"), 0.15f, 0.12f, 0.08f);
+            glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[1].diffuse"), 0.85f, 0.65f, 0.45f);
+            glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[1].specular"), 1.0f, 0.85f, 0.65f);
+            glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[1].constant"), 1.0f);
+            glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[1].linear"), 0.09f);
+            glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[1].quadratic"), 0.032f);
+
+            //xcc- activa transparencia en la sala de trofeos
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glUniform1i(glGetUniformLocation(lightingShader.Program, "transparency"), 1);
+
             //xcc- dibuja la sala de trofeos
             SalaTrofeos.Draw(lightingShader);
+
+            //xcc- dibuja la parte nueva de la sala
+            SalaTrofeosNueva.Draw(lightingShader);
+
+            //xcc- desactiva transparencia para los demas objetos
+            glUniform1i(glGetUniformLocation(lightingShader.Program, "transparency"), 0);
+            glDisable(GL_BLEND);
         }
 
 
@@ -2053,15 +2273,15 @@ void DoMovement()
                 }
             }
 
-            //xcc- corrige la colision de muebles por cada eje
+            //xcc- corrige las colisiones del Hub por cada eje
             glm::vec3 pruebaX(posicionCamara.x, 5.0f, posicionAnterior.z);
 
-            if (ColisionMueblesHub(pruebaX))
-              posicionCamara.x = posicionAnterior.x;
+            if (ColisionMueblesHub(pruebaX) || ColisionExteriorHub(pruebaX))
+                posicionCamara.x = posicionAnterior.x;
 
             glm::vec3 pruebaZ(posicionCamara.x, 5.0f, posicionCamara.z);
 
-            if (ColisionMueblesHub(pruebaZ))
+            if (ColisionMueblesHub(pruebaZ) || ColisionExteriorHub(pruebaZ))
                 posicionCamara.z = posicionAnterior.z;
 
             camera.SetPosition(posicionCamara);
@@ -2075,11 +2295,11 @@ void DoMovement()
             //xcc- mantiene la altura de la camara
             posicionCamara.y = 1.7f;
 
-            //xcc- limita las paredes laterales
+            //xcc- limita las paredes laterales de trofeos
             posicionCamara.x = glm::clamp(posicionCamara.x, -5.7f, 5.7f);
 
-            //xcc- limita la pared del fondo y deja libre la entrada
-            posicionCamara.z = glm::max(posicionCamara.z, -3.6f);
+            //xcc- limita las paredes del fondo y de la parte nueva
+            posicionCamara.z = glm::clamp(posicionCamara.z, -3.6f, 11.65f);
 
             //xcc- corrige las colisiones de trofeos por cada eje
             glm::vec3 pruebaX(posicionCamara.x, 1.7f, posicionAnterior.z);
