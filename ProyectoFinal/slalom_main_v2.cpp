@@ -1377,8 +1377,8 @@ int main()
 
             //xcc- desactiva transparencia para los demas objetos
             glUniform1i(glGetUniformLocation(lightingShader.Program, "transparency"), 0);
+            glDisable(GL_BLEND);  // <---- ¡ESTA LÍNEA-- borrala----ROMPE LA VENTISCA!
         }
-
 
 // ---- 6.7.7 Elementos de color plano: postes, colisionadores y esquiador ----
 
@@ -2881,6 +2881,8 @@ void DoMovement()
         glm::vec3 posicionAnterior = camera.GetPosition();
 
         float velocidadCamara = deltaTime * 12.0f;
+        if (escenaActual == ESCENA_TROFEOS)
+            velocidadCamara *= 0.35f;   // Sala más pequeña y cámara más baja: sin esto se siente más rápida
         if (keys[GLFW_KEY_W] || keys[GLFW_KEY_UP])    camera.ProcessKeyboard(FORWARD, velocidadCamara);
         if (keys[GLFW_KEY_S] || keys[GLFW_KEY_DOWN])  camera.ProcessKeyboard(BACKWARD, velocidadCamara);
         if (keys[GLFW_KEY_A] || keys[GLFW_KEY_LEFT])  camera.ProcessKeyboard(LEFT, velocidadCamara);
