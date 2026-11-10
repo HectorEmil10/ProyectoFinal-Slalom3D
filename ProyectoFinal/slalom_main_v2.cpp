@@ -31,6 +31,8 @@
  *          desvanecimiento gradual.
  *        - Tres niveles de dificultad/clima con transición suave.
  *        - Efecto de ventisca (nieve golpeando la cámara) activable.
+ *        - Dos contrincantes controlados por IA con trayectoria aleatoria.
+ *        - Paredes invisibles en el arco de meta.
  *
  *  Controles:
  *      W / Flecha arriba    : avanzar (3ª persona) / mover cámara (inspección)
@@ -49,15 +51,16 @@
  * ============================================================================
  */
 
-// ============================================================================
-//  ETAPA 1. INCLUSIONES
-// ============================================================================
+ // ============================================================================
+ //  ETAPA 1. INCLUSIONES
+ // ============================================================================
 
-// Biblioteca estándar
+ // Biblioteca estándar
 #include <iostream>
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -88,39 +91,50 @@ const GLuint WIDTH = 1200, HEIGHT = 800;
 
 // ---- Cámara ----
 const float ANGULO_GIRO_ESQUIADOR = 18.0f;  // Inclinación del esquiador al desplazarse (grados)
-const float FOV_BASE_GRADOS       = 58.0f;  // Campo de visión base (grados)
-const float FOV_MAXIMO_GRADOS     = 100.0f; // Tope de seguridad del campo de visión
+const float FOV_BASE_GRADOS = 58.0f;  // Campo de visión base (grados)
+const float FOV_MAXIMO_GRADOS = 100.0f; // Tope de seguridad del campo de visión
 
 // ---- Pista ----
-const float ANCHO_MEDIO_PISTA    = 60.0f;   // Distancia máxima al eje de la pista (unidades)
-const float SEPARACION_POSTES    = 20.0f;   // Separación entre postes de límite a lo largo de la pista
-const float ALTURA_POSTE         = 6.0f;    // Altura visual de los postes de límite
+const float ANCHO_MEDIO_PISTA = 60.0f;   // Distancia máxima al eje de la pista (unidades)
+const float SEPARACION_POSTES = 20.0f;   // Separación entre postes de límite a lo largo de la pista
+const float ALTURA_POSTE = 6.0f;    // Altura visual de los postes de límite
 const float PASO_MUESTREO_ALTURA = 2.0f;    // Paso del recorrido para seguir la superficie (unidades)
-const float DESFASE_POSTE        = 0.2f;    // Hundimiento de la base para ocultar huecos en pendiente
+const float DESFASE_POSTE = 0.2f;    // Hundimiento de la base para ocultar huecos en pendiente
+
+// ---- Puerta de Meta y Paredes Invisibles ----
+const float ANCHO_PUERTA_META = 7.5f;  // Semiancho libre bajo el cartel de META (ajustable con F3)
+const float GROSOR_MURO_META = 2.5f;  // Grosor de los muros invisibles laterales en la meta
+
+// ---- Contrincantes (IA) ----
+const int   NUM_CONTRINCANTES = 2;     // Dos rivales en pista
+const int   NUM_NODOS_TRAYECTORIA = 16;    // Puntos de control del zigzag aleatorio
+const float ANCHO_ZIGZAG_RIVAL = 28.0f; // Amplitud lateral máxima de la ruta de los rivales
+// Factor de velocidad de los rivales según el nivel (Fácil, Medio, Difícil)
+const float FACTOR_VEL_RIVAL_NIVEL[3] = { 0.80f, 0.90f, 0.98f };
 
 // ---- Control del esquiador ----
 const float ACELERACION_AVANCE = 1.2f;      // Rapidez para alcanzar la velocidad máxima (1/s)
-const float FRICCION_LIBRE     = 0.7f;      // Desaceleración al soltar el avance (1/s)
-const float FRENADO            = 4.0f;      // Desaceleración al frenar (1/s)
-const float RADIO_ESQUIADOR    = 1.1f;      // Radio de colisión del esquiador en el plano XZ
+const float FRICCION_LIBRE = 0.7f;      // Desaceleración al soltar el avance (1/s)
+const float FRENADO = 4.0f;      // Desaceleración al frenar (1/s)
+const float RADIO_ESQUIADOR = 1.1f;      // Radio de colisión del esquiador en el plano XZ
 
 // ---- Obstáculos (detección automática de árboles y rocas) ----
-const float MAX_ANCHO_OBSTACULO     = 14.0f; // Objetos más anchos se ignoran (terreno, carteles)
-const float MIN_ANCHO_OBSTACULO     = 0.3f;  // Objetos más angostos se ignoran
-const float MIN_ALTO_OBSTACULO      = 0.4f;  // Objetos más bajos se ignoran
-const float RADIO_MINIMO_OBSTACULO  = 0.8f;  // Radio de colisión mínimo
-const float FACTOR_RADIO_ARBOL      = 0.20f; // Radio del tronco respecto al ancho del árbol
-const float FACTOR_RADIO_ROCA       = 0.45f; // Radio de la roca respecto a su ancho
-const float FACTOR_VEL_CHOQUE       = 0.30f; // Fracción de la velocidad máxima permitida en contacto
-const float ZONA_LIBRE_SALIDA_META  = 15.0f; // Radio alrededor de salida/meta sin colisiones
+const float MAX_ANCHO_OBSTACULO = 14.0f; // Objetos más anchos se ignoran (terreno, carteles)
+const float MIN_ANCHO_OBSTACULO = 0.3f;  // Objetos más angostos se ignoran
+const float MIN_ALTO_OBSTACULO = 0.4f;  // Objetos más bajos se ignoran
+const float RADIO_MINIMO_OBSTACULO = 0.8f;  // Radio de colisión mínimo
+const float FACTOR_RADIO_ARBOL = 0.20f; // Radio del tronco respecto al ancho del árbol
+const float FACTOR_RADIO_ROCA = 0.45f; // Radio de la roca respecto a su ancho
+const float FACTOR_VEL_CHOQUE = 0.30f; // Fracción de la velocidad máxima permitida en contacto
+const float ZONA_LIBRE_SALIDA_META = 15.0f; // Radio alrededor de salida/meta sin colisiones
 
 // ---- Ventisca ----
-const int   MAX_COPOS               = 450;    // Cantidad máxima de copos en pantalla
-const float NIEBLA_EXTRA_VENTISCA   = 0.0025f; // Densidad de niebla adicional con ventisca total
+const int   MAX_COPOS = 450;    // Cantidad máxima de copos en pantalla
+const float NIEBLA_EXTRA_VENTISCA = 0.0025f; // Densidad de niebla adicional con ventisca total
 
 // ---- Mensajes en pantalla (segundos) ----
-const float TIEMPO_MENSAJE_META  = 5.0f;    // Tiempo que permanece el resultado visible
-const float TIEMPO_DESVANECER    = 2.0f;    // Duración del desvanecimiento posterior
+const float TIEMPO_MENSAJE_META = 5.0f;    // Tiempo que permanece el resultado visible
+const float TIEMPO_DESVANECER = 2.0f;    // Duración del desvanecimiento posterior
 const float TIEMPO_MENSAJE_CORTO = 1.5f;    // Mensajes breves (salida, cambio de nivel, límite)
 
 // ---- Cielo ----
@@ -188,6 +202,38 @@ struct Glifo
     unsigned char filas[7];
 };
 
+/**
+ * @brief Estado completo de un esquiador contrincante controlado por IA.
+ */
+struct Contrincante
+{
+    std::string        nombre;
+    glm::vec3          pos;
+    float              rotY;
+    float              velActual;
+    float              factorPersonal;     // Pequeña variación entre Rival 1 y Rival 2
+    float              inclinacionLat;
+    float              inclinacionTorso;
+    float              oscilacionPiernas;
+    float              tiempoAnim;
+    int                indiceTraje;        // Skin (siempre distinta a la del jugador)
+    float              avanceActual;       // Distancia recorrida sobre el eje Salida -> Meta
+    bool               terminoCarrera;
+    double             tiempoFinal;
+    std::vector<float> nodosLaterales;     // Desfases laterales aleatorios de su trayectoria
+};
+
+/**
+ * @brief Registro auxiliar para ordenar el podio final (1°, 2° y 3° lugar).
+ */
+struct ResultadoCompetidor
+{
+    std::string nombre;
+    bool        termino;
+    double      tiempo;
+    float       avance;
+};
+
 // ============================================================================
 //  ETAPA 4. VARIABLES GLOBALES
 // ============================================================================
@@ -249,7 +295,13 @@ float velActual = 0.0f;                               // Velocidad instantánea 
 int    estadoCarrera = 0;
 double tiempoInicioCarrera = 0.0;
 double tiempoActualCarrera = 0.0;
-double tiempoFinalCarrera  = 0.0;
+double tiempoFinalCarrera = 0.0;
+
+// ---- Contrincantes y Posiciones ----
+Contrincante contrincantes[NUM_CONTRINCANTES];
+int posicionJugadorActual = 1; // 1 = 1er lugar, 2 = 2do lugar, 3 = 3er lugar
+bool reiniciarContrincantes = false;   // Se activa desde el teclado; main la atiende
+
 
 // ---- Límites laterales de pista ----
 std::vector<glm::vec3> postesLimite;                  // Posición base de cada poste
@@ -266,13 +318,19 @@ float intensidadVentisca = 0.0f;                      // Intensidad suavizada [0
 float vientoVentisca = 0.0f;                          // Velocidad del viento (fracción de pantalla / s)
 
 // ---- Mensajes del HUD (instante de inicio; negativo = inactivo) ----
-double tiempoMensajeSalida    = -1.0;
-double tiempoMensajeMeta      = -1.0;
-double tiempoAvisoLimite      = -1.0;
-double tiempoMensajeNivel     = -1.0;
-double tiempoAvisoChoque      = -1.0;
-double tiempoAyudaControles   = -1.0;
-double tiempoMensajeVentisca  = -1.0;
+double tiempoMensajeSalida = -1.0;
+double tiempoMensajeMeta = -1.0;
+double tiempoAvisoLimite = -1.0;
+double tiempoMensajeNivel = -1.0;
+double tiempoAvisoChoque = -1.0;
+double tiempoAyudaControles = -1.0;
+double tiempoMensajeVentisca = -1.0;
+
+// ---- Variables de animación ----
+float tiempoAnim = 0.0f;
+float oscilacionPiernas = 0.0f;
+float inclinacionLateral = 0.0f;
+float inclinacionTorso = 0.0f;
 
 // ---- Dificultad / clima ----
 int nivelActual = 0;
@@ -286,7 +344,9 @@ const char* NOMBRES_EQUIPAMIENTO[3] = {
     "OPCION 3"
 };
 
-
+// Vector para almacenar las texturas disponibles
+std::vector<GLuint> opcionesTrajes;
+int indiceTrajeActual = 0; // 0 = Turquesa, 1 = Rojo
 
 //                                   vel   lat   niebla   sol   fov    vib   colorNiebla               colorSol                colorAmbiente
 const ParametrosAmbiente NIVELES[3] = {
@@ -366,6 +426,7 @@ static const Glifo GLIFOS[] = {
     { ':', { 0x00, 0x06, 0x06, 0x00, 0x06, 0x06, 0x00 } },
     { '-', { 0x00, 0x00, 0x00, 0x1F, 0x00, 0x00, 0x00 } },
     { '!', { 0x04, 0x04, 0x04, 0x04, 0x04, 0x00, 0x04 } },
+    { '/', { 0x01, 0x02, 0x02, 0x04, 0x08, 0x08, 0x10 } },
     { 'A', { 0x0E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11 } },
     { 'B', { 0x1E, 0x11, 0x11, 0x1E, 0x11, 0x11, 0x1E } },
     { 'C', { 0x0E, 0x11, 0x10, 0x10, 0x10, 0x11, 0x0E } },
@@ -390,6 +451,74 @@ static const Glifo GLIFOS[] = {
     { 'Z', { 0x1F, 0x01, 0x02, 0x04, 0x08, 0x10, 0x1F } }
 };
 
+
+// Crea una 3ra textura deportiva en memoria si no existe un 3er archivo PNG
+GLuint CrearTexturaTrajeProcedural()
+{
+    const int W = 64, H = 64;
+    std::vector<unsigned char> pixels(W * H * 3);
+    for (int y = 0; y < H; y++)
+    {
+        for (int x = 0; x < W; x++)
+        {
+            bool franja = ((x / 8 + y / 8) % 2 == 0);
+            int idx = (y * W + x) * 3;
+            // Combinación Dorado / Azul Marino Deportivo
+            pixels[idx + 0] = franja ? 245 : 25;
+            pixels[idx + 1] = franja ? 190 : 55;
+            pixels[idx + 2] = franja ? 30 : 130;
+        }
+    }
+    GLuint texID;
+    glGenTextures(1, &texID);
+    glBindTexture(GL_TEXTURE_2D, texID);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, W, H, 0, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+    glGenerateMipmap(GL_TEXTURE_2D);
+    return texID;
+}
+
+// Garantiza que los 2 contrincantes tengan siempre skins distintas a la del jugador y entre sí
+void AsignarSkinsContrincantes()
+{
+    int totalSkins = (int)opcionesTrajes.size();
+    if (totalSkins < 3)
+        return;
+
+    contrincantes[0].indiceTraje = (indiceTrajeActual + 1) % totalSkins;
+    contrincantes[1].indiceTraje = (indiceTrajeActual + 2) % totalSkins;
+}
+
+// Sobreescribe la textura activa en todas las mallas de una parte del cuerpo (para que Model::Draw use el traje indicado)
+void ForzarTexturaEnModelo(Model& modelo, GLuint texID)
+{
+    for (size_t m = 0; m < modelo.meshes.size(); m++)
+    {
+        if (modelo.meshes[m].textures.empty())
+        {
+            Texture t;
+            t.id = texID;
+            t.type = "texture_diffuse";
+            modelo.meshes[m].textures.push_back(t);
+        }
+        else
+        {
+            modelo.meshes[m].textures[0].id = texID;
+        }
+    }
+}
+
+// Prototipos de funciones de contrincantes
+void  GenerarTrayectoriaContrincante(Contrincante& c, int indiceRival);
+float EvaluarLateralTrayectoria(const Contrincante& c, float avance, float distTotalXZ);
+void  InicializarContrincantes(Model& terreno);
+void  ActualizarContrincantes(Model& terreno);
+int   CalcularPosicionJugador();
+
+
 // ============================================================================
 //  ETAPA 5. PROTOTIPOS DE FUNCIONES
 // ============================================================================
@@ -402,13 +531,9 @@ void MouseCallback(GLFWwindow* window, double xPos, double yPos);
 bool CercaPanelConfiguracion()
 {
     glm::vec3 posicionCamara = camera.GetPosition();
-
     glm::vec2 posicionActual(posicionCamara.x, posicionCamara.z);
-
     glm::vec2 posicionPanel(-13.1333f, -8.00144f);
-
     float distancia = glm::length(posicionActual - posicionPanel);
-
     return distancia < 5.0f;
 }
 
@@ -451,7 +576,7 @@ bool ColisionMueblesHub(glm::vec3 posicion)
     {
         return true;
     }
-    
+
 
     //xcc- colision con silla 1
     if (posicion.x > -17.8f && posicion.x < -16.1f &&
@@ -474,7 +599,7 @@ bool ColisionMueblesHub(glm::vec3 posicion)
         return true;
     }
 
-   
+
 
     //xcc- colision con mueble de la pared izquierda
     if (posicion.x > -20.2f && posicion.x < -18.2f &&
@@ -840,6 +965,50 @@ bool ColisionMueblesTrofeos(glm::vec3 posicion);
 bool CercaEntradaTrofeos();
 
 
+/**
+ * @brief Carga una textura 2D con SOIL2 (el mismo cargador que usa Model.h),
+ *        detectando automáticamente si es RGB o RGBA.
+ * @param rutaArchivo Ruta de la imagen.
+ * @return Identificador de la textura.
+ */
+GLuint CargarTextura(const char* rutaArchivo)
+{
+    GLuint textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+
+    // Configuración de wrapping y filtros
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    int textureWidth, textureHeight, nrChannels;
+    unsigned char* image = SOIL_load_image(rutaArchivo, &textureWidth, &textureHeight, &nrChannels, SOIL_LOAD_AUTO);
+
+    if (image)
+    {
+        GLenum format = GL_RGB;
+        if (nrChannels == 4)
+            format = GL_RGBA;
+        else if (nrChannels == 1)
+            format = GL_RED;
+
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);   // Anchos no múltiplo de 4
+        glTexImage2D(GL_TEXTURE_2D, 0, format, textureWidth, textureHeight, 0, format, GL_UNSIGNED_BYTE, image);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+        SOIL_free_image_data(image);
+    }
+    else
+    {
+        std::cout << "Error: No se pudo cargar la textura en la ruta: " << rutaArchivo << std::endl;
+    }
+
+    return textureID;
+}
+
+
 // ---- Ventisca ----
 void InicializarCopos();
 void ActualizarVentisca(float dt, float velNorm);
@@ -960,10 +1129,45 @@ int main()
     //xcc- carga la parte nueva de la sala de trofeos
     Model SalaTrofeosNueva((char*)"Models/Trofeos/Sala_Trofeos_parte_nueva.obj");
 
+    // Cargar las opciones de trajes para el sistema de personalización
+    GLuint texTrajeTurquesa = CargarTextura("images/traje_turquesa.png");
+    GLuint texTrajeRojo = CargarTextura("images/traje_rojo.png");
+    // Llenar el vector global
+    opcionesTrajes.push_back(texTrajeTurquesa);
+    opcionesTrajes.push_back(texTrajeRojo);
+
+    // 3ra skin para que Jugador, Rival 1 y Rival 2 siempre tengan trajes distintos
+    GLuint texTrajeDorado = CrearTexturaTrajeProcedural();
+    opcionesTrajes.push_back(texTrajeDorado);
+
+    Model PechoModel((char*)"Models/Esquiador/pecho.obj");
+    Model CaderasModel((char*)"Models/Esquiador/caderas.obj");
+    Model CinturaModel((char*)"Models/Esquiador/cintura.obj");
+    Model CuelloModel((char*)"Models/Esquiador/cuello.obj");
+    Model CabezaModel((char*)"Models/Esquiador/cabeza.obj");
+
+    Model HombroDerModel((char*)"Models/Esquiador/hombro_der.obj");
+    Model HombroIzqModel((char*)"Models/Esquiador/hombro_izq.obj");
+    Model BrazoDerModel((char*)"Models/Esquiador/brazo_der.obj");
+    Model BrazoIzqModel((char*)"Models/Esquiador/brazo_izq.obj");
+    Model AntebrazoDerModel((char*)"Models/Esquiador/antebrazo_der.obj");
+    Model AntebrazoIzqModel((char*)"Models/Esquiador/antebrazo_izq.obj");
+    Model ManoDerModel((char*)"Models/Esquiador/mano_der.obj");
+    Model ManoIzqModel((char*)"Models/Esquiador/mano_izq.obj");
+
+    Model PiernaSupDerModel((char*)"Models/Esquiador/pierna_sup_der.obj");
+    Model PiernaSupIzqModel((char*)"Models/Esquiador/pierna_sup_izq.obj");
+    Model PiernaInfDerModel((char*)"Models/Esquiador/pierna_inf_der.obj");
+    Model PiernaInfIzqModel((char*)"Models/Esquiador/pierna_inf_izq.obj");
+    Model PieDerModel((char*)"Models/Esquiador/pie_der.obj");
+    Model PieIzqModel((char*)"Models/Esquiador/pie_izq.obj");
+
     GLuint texturaSkybox = CargarSkybox(CARAS_SKYBOX);
     bool hayTexturaSkybox = (texturaSkybox != 0);
     if (!hayTexturaSkybox)
         std::cout << "[Skybox] No se pudo cargar el cubemap; se usara el cielo procedural." << std::endl;
+
+
 
     // ------------------------------------------------------------------------
     //  6.6 Preparación de la escena
@@ -981,6 +1185,9 @@ int main()
     // Copos de nieve para la ventisca
     InicializarCopos();
 
+    // Inicializar posiciones, skins y rutas aleatorias de los 2 contrincantes
+    InicializarContrincantes(PistaCompleta);
+
     // ------------------------------------------------------------------------
     //  6.7 CICLO PRINCIPAL (GAME LOOP)
     // ------------------------------------------------------------------------
@@ -992,6 +1199,15 @@ int main()
         lastFrame = currentFrame;
 
         glfwPollEvents();
+
+        // Reinicio de contrincantes solicitado desde el teclado (E, R, T)
+        if (reiniciarContrincantes)
+        {
+            InicializarContrincantes(PistaCompleta);
+            // Reasienta al jugador sobre la malla del terreno en la salida
+            skierPos.y = ObtenerAlturaTerreno(PistaCompleta, skierPos.x, skierPos.z, posSalida.y) + offsetPiesEsquiador;
+            reiniciarContrincantes = false;
+        }
 
         // ---- 6.7.2 Actualización lógica ----
         DoMovement();
@@ -1090,8 +1306,8 @@ int main()
         float densidadNiebla = esquema.densidadNiebla;   // La usa el skybox más abajo
 
         GLint modelLoc = glGetUniformLocation(lightingShader.Program, "model");
-        GLint viewLoc  = glGetUniformLocation(lightingShader.Program, "view");
-        GLint projLoc  = glGetUniformLocation(lightingShader.Program, "projection");
+        GLint viewLoc = glGetUniformLocation(lightingShader.Program, "view");
+        GLint projLoc = glGetUniformLocation(lightingShader.Program, "projection");
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
@@ -1100,7 +1316,7 @@ int main()
         glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
         glUniform1i(glGetUniformLocation(lightingShader.Program, "transparency"), 0);
         glUniform2f(glGetUniformLocation(lightingShader.Program, "uvOffset"), 0.0f, 0.0f);
-       /* PistaCompleta.Draw(lightingShader); */
+        /* PistaCompleta.Draw(lightingShader); */
         if (escenaActual == ESCENA_HUB)
         {
             HubCentral.Draw(lightingShader);
@@ -1172,9 +1388,9 @@ int main()
         {
             colorShader.Use();
 
-            glUniformMatrix4fv( glGetUniformLocation(colorShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
+            glUniformMatrix4fv(glGetUniformLocation(colorShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
 
-            glUniformMatrix4fv( glGetUniformLocation(colorShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+            glUniformMatrix4fv(glGetUniformLocation(colorShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
             GLint colorModelLoc = glGetUniformLocation(colorShader.Program, "model");
 
@@ -1183,15 +1399,15 @@ int main()
             // Postes de límite
             for (size_t i = 0; i < postesLimite.size(); i++)
             {
-                glm::mat4 modelPoste = glm::translate( glm::mat4(1.0f), postesLimite[i] + glm::vec3( 0.0f, ALTURA_POSTE * 0.5f - DESFASE_POSTE, 0.0f));
+                glm::mat4 modelPoste = glm::translate(glm::mat4(1.0f), postesLimite[i] + glm::vec3(0.0f, ALTURA_POSTE * 0.5f - DESFASE_POSTE, 0.0f));
 
-                modelPoste = glm::scale( modelPoste, glm::vec3(0.6f, ALTURA_POSTE, 0.6f));
+                modelPoste = glm::scale(modelPoste, glm::vec3(0.6f, ALTURA_POSTE, 0.6f));
 
-                glUniformMatrix4fv( colorModelLoc, 1, GL_FALSE, glm::value_ptr(modelPoste));
+                glUniformMatrix4fv(colorModelLoc, 1, GL_FALSE, glm::value_ptr(modelPoste));
 
                 glm::vec3 colorPoste = ((i / 2) % 2 == 0) ? glm::vec3(0.85f, 0.10f, 0.10f) : glm::vec3(0.95f, 0.95f, 0.95f);
 
-                glUniform3fv( colorShader.uniformColor,  1, glm::value_ptr(colorPoste));
+                glUniform3fv(colorShader.uniformColor, 1, glm::value_ptr(colorPoste));
 
                 glDrawArrays(GL_TRIANGLES, 0, 36);
             }
@@ -1207,14 +1423,7 @@ int main()
 
                     float alto = o.yMax - o.yMin;
 
-                    glm::mat4 modelCol = glm::translate(
-                        glm::mat4(1.0f),
-                        glm::vec3(
-                            o.centro.x,
-                            o.yMin + alto * 0.5f,
-                            o.centro.z
-                        )
-                    );
+                    glm::mat4 modelCol = glm::translate(glm::mat4(1.0f), glm::vec3(o.centro.x, o.yMin + alto * 0.5f, o.centro.z));
 
                     modelCol = glm::scale(
                         modelCol,
@@ -1246,66 +1455,195 @@ int main()
                     glDrawArrays(GL_TRIANGLES, 0, 36);
                 }
 
+                // Dibujar las 2 paredes invisibles a los lados del arco de META (en color cian)
+                glm::vec2 vecPistaXZ(posMeta.x - posSalida.x, posMeta.z - posSalida.z);
+                float distTotalDbg = glm::length(vecPistaXZ);
+                if (distTotalDbg > 0.001f)
+                {
+                    glm::vec2 dirP = glm::normalize(vecPistaXZ);
+                    glm::vec2 dirD(dirP.y, -dirP.x);
+                    float anguloMeta = glm::degrees(std::atan2(dirP.x, dirP.y));
+                    float anchoMuroLat = ANCHO_MEDIO_PISTA - ANCHO_PUERTA_META;
+                    float centroLat = ANCHO_PUERTA_META + anchoMuroLat * 0.5f;
+
+                    for (int lado = -1; lado <= 1; lado += 2)
+                    {
+                        // El muro ocupa el tramo [distTotal - GROSOR, distTotal] sobre el eje de la pista
+                        glm::vec3 posMuro(
+                            posMeta.x + dirD.x * (centroLat * lado) - dirP.x * (GROSOR_MURO_META * 0.5f),
+                            posMeta.y + 4.0f,
+                            posMeta.z + dirD.y * (centroLat * lado) - dirP.y * (GROSOR_MURO_META * 0.5f)
+                        );
+                        glm::mat4 modelMuro = glm::translate(glm::mat4(1.0f), posMuro);
+                        modelMuro = glm::rotate(modelMuro, glm::radians(anguloMeta), glm::vec3(0.0f, 1.0f, 0.0f));
+                        modelMuro = glm::scale(modelMuro, glm::vec3(anchoMuroLat, 10.0f, GROSOR_MURO_META));
+                        glUniformMatrix4fv(colorModelLoc, 1, GL_FALSE, glm::value_ptr(modelMuro));
+                        glm::vec3 colorCian(0.0f, 0.9f, 1.0f);
+                        glUniform3fv(colorShader.uniformColor, 1, glm::value_ptr(colorCian));
+                        glDrawArrays(GL_TRIANGLES, 0, 36);
+                    }
+                }
+
                 glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
             }
 
-            // Nodo raíz temporal del esquiador
-            glm::mat4 modelTemp = glm::mat4(1.0f);
-            modelTemp = glm::translate(modelTemp, skierPos);
-
-            modelTemp = glm::rotate(
-                modelTemp,
-                glm::radians(skierRotY),
-                glm::vec3(0.0f, 1.0f, 0.0f)
-            );
-
-            glm::mat4 modelIndicador = glm::scale(
-                modelTemp,
-                glm::vec3(1.5f, 3.0f, 1.5f)
-            );
-
-            glUniformMatrix4fv(
-                colorModelLoc,
-                1,
-                GL_FALSE,
-                glm::value_ptr(modelIndicador)
-            );
-
-            glm::vec3 colorNaranja(1.0f, 0.35f, 0.0f);
-
-            glUniform3fv(
-                colorShader.uniformColor,
-                1,
-                glm::value_ptr(colorNaranja)
-            );
-
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-
             glBindVertexArray(0);
-        }
+
+            // ---- Esquiadores articulados (jugador y contrincantes) ----
+            lightingShader.Use();
+            glUniform1i(glGetUniformLocation(lightingShader.Program, "transparency"), 0);
+            glUniform2f(glGetUniformLocation(lightingShader.Program, "uvOffset"), 0.0f, 0.0f);
+
+            // Lambda reutilizable para dibujar cualquier esquiador articulado (Jugador o Contrincantes)
+            auto DibujarEsquiador = [&](const glm::vec3& posEsq, float rotYEsq, float incLat, float incTorso, float oscPiernas, GLuint texTraje, const glm::vec3& tinteDifuso)
+                {
+                    glActiveTexture(GL_TEXTURE0);
+                    glBindTexture(GL_TEXTURE_2D, texTraje);
+                    glUniform1i(glGetUniformLocation(lightingShader.Program, "texture_diffuse"), 0);
+                    glUniform1i(glGetUniformLocation(lightingShader.Program, "texture_diffuse1"), 0);
+                    glUniform3f(glGetUniformLocation(lightingShader.Program, "material.diffuse"), tinteDifuso.r, tinteDifuso.g, tinteDifuso.b);
+
+                    ForzarTexturaEnModelo(CaderasModel, texTraje);
+                    ForzarTexturaEnModelo(PiernaSupIzqModel, texTraje);
+                    ForzarTexturaEnModelo(PiernaInfIzqModel, texTraje);
+                    ForzarTexturaEnModelo(PieIzqModel, texTraje);
+                    ForzarTexturaEnModelo(PiernaSupDerModel, texTraje);
+                    ForzarTexturaEnModelo(PiernaInfDerModel, texTraje);
+                    ForzarTexturaEnModelo(PieDerModel, texTraje);
+                    ForzarTexturaEnModelo(CinturaModel, texTraje);
+                    ForzarTexturaEnModelo(PechoModel, texTraje);
+                    ForzarTexturaEnModelo(CuelloModel, texTraje);
+                    ForzarTexturaEnModelo(CabezaModel, texTraje);
+                    ForzarTexturaEnModelo(HombroIzqModel, texTraje);
+                    ForzarTexturaEnModelo(BrazoIzqModel, texTraje);
+                    ForzarTexturaEnModelo(AntebrazoIzqModel, texTraje);
+                    ForzarTexturaEnModelo(ManoIzqModel, texTraje);
+                    ForzarTexturaEnModelo(HombroDerModel, texTraje);
+                    ForzarTexturaEnModelo(BrazoDerModel, texTraje);
+                    ForzarTexturaEnModelo(AntebrazoDerModel, texTraje);
+                    ForzarTexturaEnModelo(ManoDerModel, texTraje);
+
+                    glm::mat4 modelSkier = glm::mat4(1.0f);
+                    modelSkier = glm::translate(modelSkier, posEsq);
+                    modelSkier = glm::rotate(modelSkier, glm::radians(rotYEsq), glm::vec3(0.0f, 1.0f, 0.0f));
+
+                    // --- TREN INFERIOR ---
+                    glm::mat4 modelCaderas = glm::translate(modelSkier, glm::vec3(0.0f, -0.9f, 0.0f));
+                    modelCaderas = glm::rotate(modelCaderas, glm::radians(incLat), glm::vec3(0.0f, 0.0f, 1.0f));
+                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelCaderas));
+                    CaderasModel.Draw(lightingShader);
+
+                    glm::mat4 modelPiernaSupIzq = glm::translate(modelCaderas, glm::vec3(-0.35f, -0.04f, 0.0f));
+                    modelPiernaSupIzq = glm::rotate(modelPiernaSupIzq, glm::radians(oscPiernas), glm::vec3(1.0f, 0.0f, 0.0f));
+                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPiernaSupIzq));
+                    PiernaSupIzqModel.Draw(lightingShader);
+
+                    glm::mat4 modelPiernaInfIzq = glm::translate(modelPiernaSupIzq, glm::vec3(0.0f, -0.04f, 0.0f));
+                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPiernaInfIzq));
+                    PiernaInfIzqModel.Draw(lightingShader);
+
+                    glm::mat4 modelPieIzq = glm::translate(modelPiernaInfIzq, glm::vec3(0.0f, -0.04f, 0.0f));
+                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPieIzq));
+                    PieIzqModel.Draw(lightingShader);
+
+                    glm::mat4 modelPiernaSupDer = glm::translate(modelCaderas, glm::vec3(0.35f, -0.04f, 0.0f));
+                    modelPiernaSupDer = glm::rotate(modelPiernaSupDer, glm::radians(-oscPiernas), glm::vec3(1.0f, 0.0f, 0.0f));
+                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPiernaSupDer));
+                    PiernaSupDerModel.Draw(lightingShader);
+
+                    glm::mat4 modelPiernaInfDer = glm::translate(modelPiernaSupDer, glm::vec3(0.0f, -0.04f, 0.0f));
+                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPiernaInfDer));
+                    PiernaInfDerModel.Draw(lightingShader);
+
+                    glm::mat4 modelPieDer = glm::translate(modelPiernaInfDer, glm::vec3(0.0f, -0.04f, 0.0f));
+                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPieDer));
+                    PieDerModel.Draw(lightingShader);
+
+                    // --- TREN SUPERIOR ---
+                    glm::mat4 modelCintura = modelCaderas;
+                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelCintura));
+                    CinturaModel.Draw(lightingShader);
+
+                    glm::mat4 modelPecho = glm::translate(modelCintura, glm::vec3(0.0f, 0.04f, 0.0f));
+                    modelPecho = glm::rotate(modelPecho, glm::radians(incTorso), glm::vec3(1.0f, 0.0f, 0.0f));
+                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPecho));
+                    PechoModel.Draw(lightingShader);
+
+                    glm::mat4 modelCuello = glm::translate(modelPecho, glm::vec3(0.0f, 0.04f, 0.0f));
+                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelCuello));
+                    CuelloModel.Draw(lightingShader);
+
+                    glm::mat4 modelCabeza = glm::translate(modelCuello, glm::vec3(0.0f, 0.1f, 0.0f));
+                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelCabeza));
+                    CabezaModel.Draw(lightingShader);
+
+                    // --- BRAZOS Y MANOS ---
+                    glm::mat4 modelHombroIzq = glm::translate(modelPecho, glm::vec3(-0.08f, -0.1f, 0.0f));
+                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelHombroIzq));
+                    HombroIzqModel.Draw(lightingShader);
+
+                    glm::mat4 modelBrazoIzq = modelHombroIzq;
+                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelBrazoIzq));
+                    BrazoIzqModel.Draw(lightingShader);
+
+                    glm::mat4 modelAntebrazoIzq = glm::translate(modelBrazoIzq, glm::vec3(0.0f, -0.009f, 0.0f));
+                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelAntebrazoIzq));
+                    AntebrazoIzqModel.Draw(lightingShader);
+
+                    glm::mat4 modelManoIzq = glm::translate(modelAntebrazoIzq, glm::vec3(0.0f, 0.01f, 0.0f));
+                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelManoIzq));
+                    ManoIzqModel.Draw(lightingShader);
+
+                    glm::mat4 modelHombroDer = glm::translate(modelPecho, glm::vec3(0.08f, -0.1f, 0.0f));
+                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelHombroDer));
+                    HombroDerModel.Draw(lightingShader);
+
+                    glm::mat4 modelBrazoDer = modelHombroDer;
+                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelBrazoDer));
+                    BrazoDerModel.Draw(lightingShader);
+
+                    glm::mat4 modelAntebrazoDer = glm::translate(modelBrazoDer, glm::vec3(0.0f, -0.009f, 0.0f));
+                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelAntebrazoDer));
+                    AntebrazoDerModel.Draw(lightingShader);
+
+                    glm::mat4 modelManoDer = glm::translate(modelAntebrazoDer, glm::vec3(0.0f, 0.01f, 0.0f));
+                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelManoDer));
+                    ManoDerModel.Draw(lightingShader);
+                };
+
+            // 1. Dibujar al Jugador
+            AsignarSkinsContrincantes();
+            DibujarEsquiador(skierPos, skierRotY, inclinacionLateral, inclinacionTorso,
+                oscilacionPiernas, opcionesTrajes[indiceTrajeActual], glm::vec3(0.85f, 0.85f, 0.85f));
+
+            // 2. Dibujar a los 2 Contrincantes con sus skins distintas
+            glm::vec3 tintesRivales[2] = { glm::vec3(0.95f, 0.80f, 0.80f), glm::vec3(0.80f, 0.90f, 1.00f) };
+            for (int r = 0; r < NUM_CONTRINCANTES; r++)
+            {
+                const Contrincante& c = contrincantes[r];
+                DibujarEsquiador(c.pos, c.rotY, c.inclinacionLat, c.inclinacionTorso,
+                    c.oscilacionPiernas, opcionesTrajes[c.indiceTraje], tintesRivales[r]);
+            }
+            glUniform3f(glGetUniformLocation(lightingShader.Program, "material.diffuse"), 0.8f, 0.8f, 0.8f);
+        }   // Fin del bloque exclusivo de la pista
 
 
         //xcc- terreno amplio alrededor del Hub
         if (escenaActual == ESCENA_HUB || escenaActual == ESCENA_TROFEOS)
         {
             colorShader.Use();
-
-            glUniformMatrix4fv( glGetUniformLocation(colorShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
-
-            glUniformMatrix4fv( glGetUniformLocation(colorShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-
+            glUniformMatrix4fv(glGetUniformLocation(colorShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
+            glUniformMatrix4fv(glGetUniformLocation(colorShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
             GLint colorModelLoc = glGetUniformLocation(colorShader.Program, "model");
-
             glBindVertexArray(VAO);
-
             glm::mat4 sueloHub = glm::mat4(1.0f);
 
             //xcc- nieve debajo del Hub
             sueloHub = glm::translate(sueloHub, glm::vec3(0.0f, -0.11f, 0.0f));
 
-            sueloHub = glm::scale( sueloHub, glm::vec3(500.0f, 0.10f, 500.0f));
+            sueloHub = glm::scale(sueloHub, glm::vec3(500.0f, 0.10f, 500.0f));
 
-            glUniformMatrix4fv( colorModelLoc, 1, GL_FALSE, glm::value_ptr(sueloHub));
+            glUniformMatrix4fv(colorModelLoc, 1, GL_FALSE, glm::value_ptr(sueloHub));
 
             glm::vec3 colorNieve(0.90f, 0.94f, 1.0f);
 
@@ -1616,8 +1954,8 @@ void ConstruirColisionadores(Model& modelo)
             long long iy = (long long)std::floor(verts[v].Position.y / 0.02f);
             long long iz = (long long)std::floor(verts[v].Position.z / 0.02f);
             unsigned long long clave = ((unsigned long long)(ix & 0x1FFFFFLL) << 42)
-                                     | ((unsigned long long)(iy & 0x1FFFFFLL) << 21)
-                                     |  (unsigned long long)(iz & 0x1FFFFFLL);
+                | ((unsigned long long)(iy & 0x1FFFFFLL) << 21)
+                | (unsigned long long)(iz & 0x1FFFFFLL);
 
             std::unordered_map<unsigned long long, int>::iterator it = soldadura.find(clave);
             if (it == soldadura.end())
@@ -1679,7 +2017,7 @@ void ConstruirColisionadores(Model& modelo)
     }
 
     std::cout << "[Colisiones] Obstaculos detectados: " << obstaculos.size()
-              << " (" << arboles << " arboles, " << rocas << " rocas). F3 para visualizarlos." << std::endl;
+        << " (" << arboles << " arboles, " << rocas << " rocas). F3 para visualizarlos." << std::endl;
 }
 
 /**
@@ -1745,32 +2083,255 @@ void ActualizarAmbiente(float dt)
     float k = 1.0f - std::exp(-tasa * dt);
 
     ambienteActual.velocidadDescenso += (obj.velocidadDescenso - ambienteActual.velocidadDescenso) * k;
-    ambienteActual.velocidadLateral  += (obj.velocidadLateral  - ambienteActual.velocidadLateral)  * k;
-    ambienteActual.densidadNiebla    += (obj.densidadNiebla    - ambienteActual.densidadNiebla)    * k;
-    ambienteActual.intensidadSol     += (obj.intensidadSol     - ambienteActual.intensidadSol)     * k;
-    ambienteActual.factorFov         += (obj.factorFov         - ambienteActual.factorFov)         * k;
+    ambienteActual.velocidadLateral += (obj.velocidadLateral - ambienteActual.velocidadLateral) * k;
+    ambienteActual.densidadNiebla += (obj.densidadNiebla - ambienteActual.densidadNiebla) * k;
+    ambienteActual.intensidadSol += (obj.intensidadSol - ambienteActual.intensidadSol) * k;
+    ambienteActual.factorFov += (obj.factorFov - ambienteActual.factorFov) * k;
     ambienteActual.amplitudVibracion += (obj.amplitudVibracion - ambienteActual.amplitudVibracion) * k;
-    ambienteActual.colorNiebla   = glm::mix(ambienteActual.colorNiebla,   obj.colorNiebla,   k);
-    ambienteActual.colorSol      = glm::mix(ambienteActual.colorSol,      obj.colorSol,      k);
+    ambienteActual.colorNiebla = glm::mix(ambienteActual.colorNiebla, obj.colorNiebla, k);
+    ambienteActual.colorSol = glm::mix(ambienteActual.colorSol, obj.colorSol, k);
     ambienteActual.colorAmbiente = glm::mix(ambienteActual.colorAmbiente, obj.colorAmbiente, k);
 }
 
 /**
- * @brief Actualiza la carrera:
- *          - Control manual: avance (W / flecha arriba), freno (S / flecha
- *            abajo) y giro lateral (A/D / flechas laterales).
- *          - Colisiones con obstáculos y límites laterales de pista.
- *          - Ajuste de altura sobre la malla del terreno.
- *          - Cronómetro y detección de META (solo al cruzar la línea).
- * @param terreno Modelo de la pista (para ajustar la altura del esquiador).
+ * @brief Genera una trayectoria en zigzag semi-aleatoria desde la Salida
+ *        hasta el centro del arco de Meta para un contrincante.
+ */
+void GenerarTrayectoriaContrincante(Contrincante& c, int indiceRival)
+{
+    c.nodosLaterales.resize(NUM_NODOS_TRAYECTORIA);
+
+    // En la salida se colocan a la izquierda (-6 m) y derecha (+6 m) del jugador
+    float ladoInicial = (indiceRival == 0) ? -6.0f : 6.0f;
+    c.nodosLaterales[0] = ladoInicial;
+
+    int signo = (indiceRival == 0) ? -1 : 1;
+    for (int i = 1; i < NUM_NODOS_TRAYECTORIA - 2; i++)
+    {
+        float amplitud = 8.0f + (float)(std::rand() % (int)ANCHO_ZIGZAG_RIVAL);
+        c.nodosLaterales[i] = signo * amplitud;
+        signo = -signo; // Alterna izquierda y derecha como en slalom real
+    }
+
+    // Los últimos 2 nodos embudan obligatoriamente dentro de la puerta de META
+    c.nodosLaterales[NUM_NODOS_TRAYECTORIA - 2] = (indiceRival == 0) ? -3.0f : 3.0f;
+    c.nodosLaterales[NUM_NODOS_TRAYECTORIA - 1] = (indiceRival == 0) ? -2.0f : 2.0f;
+}
+
+/**
+ * @brief Evalúa el desplazamiento lateral suave de la trayectoria del
+ *        contrincante según su avance longitudinal.
+ */
+float EvaluarLateralTrayectoria(const Contrincante& c, float avance, float distTotalXZ)
+{
+    if (c.nodosLaterales.empty() || distTotalXZ <= 0.001f)
+        return 0.0f;
+
+    float u = glm::clamp(avance / distTotalXZ, 0.0f, 1.0f);
+    float posNodo = u * (float)(c.nodosLaterales.size() - 1);
+    int idx0 = (int)std::floor(posNodo);
+    int idx1 = glm::min(idx0 + 1, (int)c.nodosLaterales.size() - 1);
+    float f = posNodo - (float)idx0;
+
+    // Interpolación cúbica suave (Smoothstep) para giros naturales
+    float fSuave = f * f * (3.0f - 2.0f * f);
+    return glm::mix(c.nodosLaterales[idx0], c.nodosLaterales[idx1], fSuave);
+}
+
+/**
+ * @brief Coloca a los dos contrincantes en la línea de salida, les asigna
+ *        skins diferentes a la del jugador y traza su camino hacia la meta.
+ */
+void InicializarContrincantes(Model& terreno)
+{
+    std::srand((unsigned int)(glfwGetTime() * 1000.0) + 777);
+
+    glm::vec2 vecTotalXZ(posMeta.x - posSalida.x, posMeta.z - posSalida.z);
+    glm::vec2 dirPista = (glm::length(vecTotalXZ) > 0.001f) ? glm::normalize(vecTotalXZ) : glm::vec2(1.0f, 0.0f);
+    glm::vec2 dirDerecha(dirPista.y, -dirPista.x);
+    float anguloBase = glm::degrees(std::atan2(dirPista.x, dirPista.y));
+
+    AsignarSkinsContrincantes();
+
+    for (int r = 0; r < NUM_CONTRINCANTES; r++)
+    {
+        Contrincante& c = contrincantes[r];
+        c.nombre = (r == 0) ? "RIVAL 1" : "RIVAL 2";
+        c.factorPersonal = (r == 0) ? 0.97f : 1.03f; // Variación entre ambos rivales
+        GenerarTrayectoriaContrincante(c, r);
+
+        float latInicial = c.nodosLaterales[0];
+        c.pos.x = posSalida.x + dirDerecha.x * latInicial;
+        c.pos.z = posSalida.z + dirDerecha.y * latInicial;
+        c.pos.y = ObtenerAlturaTerreno(terreno, c.pos.x, c.pos.z, posSalida.y) + offsetPiesEsquiador;
+
+        c.rotY = anguloBase;
+        c.velActual = 0.0f;
+        c.inclinacionLat = 0.0f;
+        c.inclinacionTorso = 0.0f;
+        c.oscilacionPiernas = 0.0f;
+        c.tiempoAnim = 0.0f;
+        c.avanceActual = 0.0f;
+        c.terminoCarrera = false;
+        c.tiempoFinal = 0.0;
+    }
+    posicionJugadorActual = 1;
+}
+
+/**
+ * @brief Actualiza el avance, seguimiento de trayectoria, colisiones con
+ *        obstáculos y altura sobre el terreno de los dos contrincantes.
+ */
+void ActualizarContrincantes(Model& terreno)
+{
+    if (estadoCarrera == 0)
+        return;
+
+    glm::vec2 vecTotalXZ(posMeta.x - posSalida.x, posMeta.z - posSalida.z);
+    float distTotalXZ = glm::length(vecTotalXZ);
+    if (distTotalXZ <= 0.001f)
+        return;
+
+    glm::vec2 dirPista = glm::normalize(vecTotalXZ);
+    glm::vec2 dirDerecha(dirPista.y, -dirPista.x);
+    float anguloBase = glm::degrees(std::atan2(dirPista.x, dirPista.y));
+    double ahora = glfwGetTime();
+
+    for (int r = 0; r < NUM_CONTRINCANTES; r++)
+    {
+        Contrincante& c = contrincantes[r];
+        if (c.terminoCarrera)
+        {
+            c.velActual = Suavizar(c.velActual, 0.0f, FRENADO, deltaTime);
+            c.oscilacionPiernas = 0.0f;
+            c.inclinacionLat = Suavizar(c.inclinacionLat, 0.0f, 8.0f, deltaTime);
+            c.inclinacionTorso = Suavizar(c.inclinacionTorso, 0.0f, 8.0f, deltaTime);
+            continue;
+        }
+
+        // Velocidad objetivo según el nivel de dificultad (Fácil, Medio, Difícil)
+        float pulsoRitmo = 1.0f + 0.04f * std::sin((float)ahora * 2.2f + r * 3.14f);
+        float velObjetivo = NIVELES[nivelActual].velocidadDescenso
+            * FACTOR_VEL_RIVAL_NIVEL[nivelActual]
+            * c.factorPersonal * pulsoRitmo;
+
+        c.velActual = Suavizar(c.velActual, velObjetivo, ACELERACION_AVANCE * 1.15f, deltaTime);
+
+        // Avance longitudinal sobre la pendiente
+        c.avanceActual += c.velActual * deltaTime;
+
+        // Seguimiento de la trayectoria semi-aleatoria en zigzag
+        float latObjetivo = EvaluarLateralTrayectoria(c, c.avanceActual + 8.0f, distTotalXZ);
+        glm::vec2 relActual(c.pos.x - posSalida.x, c.pos.z - posSalida.z);
+        float latActual = glm::dot(relActual, dirDerecha);
+
+        float diffLat = latObjetivo - latActual;
+        float pasoMaxLat = NIVELES[nivelActual].velocidadLateral * 0.85f * deltaTime;
+        float pasoLat = glm::clamp(diffLat * 3.0f * deltaTime, -pasoMaxLat, pasoMaxLat);
+        float nuevaLat = glm::clamp(latActual + pasoLat, -ANCHO_MEDIO_PISTA + 2.0f, ANCHO_MEDIO_PISTA - 2.0f);
+
+        // Actualizar posición en XZ
+        c.pos.x = posSalida.x + dirPista.x * c.avanceActual + dirDerecha.x * nuevaLat;
+        c.pos.z = posSalida.z + dirPista.y * c.avanceActual + dirDerecha.y * nuevaLat;
+
+        // Evasión de obstáculos (árboles y rocas)
+        glm::vec2 salidaXZ(posSalida.x, posSalida.z);
+        glm::vec2 metaXZ(posMeta.x, posMeta.z);
+        for (size_t i = 0; i < obstaculos.size(); i++)
+        {
+            const Obstaculo& o = obstaculos[i];
+            glm::vec2 centroObs(o.centro.x, o.centro.z);
+            if (glm::distance(centroObs, salidaXZ) < ZONA_LIBRE_SALIDA_META ||
+                glm::distance(centroObs, metaXZ) < ZONA_LIBRE_SALIDA_META)
+                continue;
+
+            float dx = c.pos.x - centroObs.x;
+            float dz = c.pos.z - centroObs.y;
+            float distMin = o.radio + RADIO_ESQUIADOR;
+            float d2 = dx * dx + dz * dz;
+            if (d2 < distMin * distMin && d2 > 0.0001f)
+            {
+                float d = std::sqrt(d2);
+                c.pos.x = centroObs.x + (dx / d) * distMin;
+                c.pos.z = centroObs.y + (dz / d) * distMin;
+                c.velActual *= 0.85f;
+            }
+        }
+
+        // Mantener al contrincante pegado exactamente a la malla del terreno
+        float ySuelo = ObtenerAlturaTerreno(terreno, c.pos.x, c.pos.z, c.pos.y - offsetPiesEsquiador);
+        c.pos.y = ySuelo + offsetPiesEsquiador;
+
+        // Orientación y animaciones articuladas del contrincante
+        float giroVisual = glm::clamp(diffLat * 1.8f, -ANGULO_GIRO_ESQUIADOR, ANGULO_GIRO_ESQUIADOR);
+        c.rotY = Suavizar(c.rotY, anguloBase + giroVisual, 10.0f, deltaTime);
+        c.inclinacionLat = Suavizar(c.inclinacionLat, -giroVisual, 10.0f, deltaTime);
+        c.inclinacionTorso = Suavizar(c.inclinacionTorso, 8.0f, 8.0f, deltaTime);
+
+        c.tiempoAnim += deltaTime * (c.velActual * 0.2f);
+        c.oscilacionPiernas = std::sin(c.tiempoAnim * 15.0f) * (12.0f * (c.velActual / NIVELES[nivelActual].velocidadDescenso));
+
+        // Verificar si el contrincante cruzó la línea de META
+        if (c.avanceActual >= distTotalXZ)
+        {
+            c.avanceActual = distTotalXZ;
+            c.terminoCarrera = true;
+            c.tiempoFinal = ahora - tiempoInicioCarrera;
+            std::cout << ">>> [" << c.nombre << "] cruzo la META en: " << c.tiempoFinal << " seg" << std::endl;
+        }
+    }
+}
+
+/**
+ * @brief Calcula la posición del jugador (1, 2 o 3) en tiempo real o al final.
+ */
+int CalcularPosicionJugador()
+{
+    glm::vec2 vecTotalXZ(posMeta.x - posSalida.x, posMeta.z - posSalida.z);
+    glm::vec2 dirPista = (glm::length(vecTotalXZ) > 0.001f) ? glm::normalize(vecTotalXZ) : glm::vec2(1.0f, 0.0f);
+    float avanceJugador = glm::dot(glm::vec2(skierPos.x - posSalida.x, skierPos.z - posSalida.z), dirPista);
+
+    int lugar = 1;
+    for (int r = 0; r < NUM_CONTRINCANTES; r++)
+    {
+        const Contrincante& c = contrincantes[r];
+        if (estadoCarrera == 2)
+        {
+            // El jugador ya cruzó la meta: solo está delante quien haya terminado con menor tiempo
+            if (c.terminoCarrera && c.tiempoFinal < tiempoFinalCarrera)
+                lugar++;
+        }
+        else
+        {
+            // En carrera: está delante quien ya terminó o lleva mayor avance longitudinal
+            if (c.terminoCarrera || c.avanceActual > avanceJugador)
+                lugar++;
+        }
+    }
+    return lugar;
+}
+
+/**
+ * @brief Actualiza la carrera del jugador, a los contrincantes y aplica las
+ *        paredes invisibles en el arco de META.
  */
 void ActualizarCarrera(Model& terreno)
 {
+    // Si el jugador ya cruzó la meta, los contrincantes siguen bajando hasta terminar
+    if (estadoCarrera == 2)
+    {
+        ActualizarContrincantes(terreno);
+        return;
+    }
+
     if (estadoCarrera != 1)
         return;
 
     double ahora = glfwGetTime();
     tiempoActualCarrera = ahora - tiempoInicioCarrera;
+
+    // Actualizar contrincantes de IA
+    ActualizarContrincantes(terreno);
 
     glm::vec2 vecTotalXZ(posMeta.x - posSalida.x, posMeta.z - posSalida.z);
     float distTotalXZ = glm::length(vecTotalXZ);
@@ -1781,11 +2342,9 @@ void ActualizarCarrera(Model& terreno)
     glm::vec2 dirDerecha(dirPista.y, -dirPista.x);
     float anguloBase = glm::degrees(atan2(dirPista.x, dirPista.y));
 
-    // ---- Entrada: en la cámara de inspección las teclas mueven la cámara ----
     bool avanzar = (keys[GLFW_KEY_W] || keys[GLFW_KEY_UP]) && modoCamara == 1;
-    bool frenar  = (keys[GLFW_KEY_S] || keys[GLFW_KEY_DOWN]) && modoCamara == 1;
+    bool frenar = (keys[GLFW_KEY_S] || keys[GLFW_KEY_DOWN]) && modoCamara == 1;
 
-    // ---- Velocidad: acelera al avanzar, frena o se detiene por fricción ----
     float objetivo = 0.0f;
     float tasa = FRICCION_LIBRE;
     if (frenar)
@@ -1801,11 +2360,14 @@ void ActualizarCarrera(Model& terreno)
     if (velActual < 0.05f && objetivo == 0.0f)
         velActual = 0.0f;
 
-    // ---- Avance en XZ sobre el eje de la pista ----
+    // Avance previo antes de mover este fotograma (para las paredes invisibles de la meta)
+    float avancePrevio = glm::dot(glm::vec2(skierPos.x - posSalida.x, skierPos.z - posSalida.z), dirPista);
+
+    // Avance en XZ sobre el eje de la pista
     skierPos.x += dirPista.x * velActual * deltaTime;
     skierPos.z += dirPista.y * velActual * deltaTime;
 
-    // ---- Slalom lateral (A/D o flechas) ----
+    // Slalom lateral (A/D o flechas)
     if (modoCamara == 1)
     {
         float anguloObjetivo = anguloBase;
@@ -1826,27 +2388,30 @@ void ActualizarCarrera(Model& terreno)
         skierRotY = Suavizar(skierRotY, anguloObjetivo, 10.0f, deltaTime);
     }
 
-    // ---- Colisiones con árboles y rocas ----
+    // Colisiones con árboles y rocas
     if (ResolverColisiones(dirPista))
     {
         velActual = glm::min(velActual, ambienteActual.velocidadDescenso * FACTOR_VEL_CHOQUE);
         tiempoAvisoChoque = ahora;
     }
 
-    // ---- Límites laterales: se proyecta la posición sobre el eje lateral ----
+    // Proyección longitudinal (avance) y lateral respecto al eje Salida -> Meta
     glm::vec2 relativo(skierPos.x - posSalida.x, skierPos.z - posSalida.z);
     float lateral = glm::dot(relativo, dirDerecha);
+    float avance = glm::dot(relativo, dirPista);
+
+    // Límites laterales generales de la pista
     if (std::abs(lateral) > ANCHO_MEDIO_PISTA)
     {
         float limite = (lateral > 0.0f) ? ANCHO_MEDIO_PISTA : -ANCHO_MEDIO_PISTA;
         float exceso = lateral - limite;
         skierPos.x -= dirDerecha.x * exceso;
         skierPos.z -= dirDerecha.y * exceso;
+        lateral = limite;
         tiempoAvisoLimite = ahora;
     }
 
-    // ---- No retroceder más allá de la línea de salida ----
-    float avance = glm::dot(glm::vec2(skierPos.x - posSalida.x, skierPos.z - posSalida.z), dirPista);
+    // No retroceder más allá de la línea de salida
     if (avance < 0.0f)
     {
         skierPos.x -= dirPista.x * avance;
@@ -1854,19 +2419,49 @@ void ActualizarCarrera(Model& terreno)
         avance = 0.0f;
     }
 
-    // ---- Altura exacta leyendo el triángulo de la malla bajo el esquiador ----
+    // ---- PAREDES INVISIBLES EN EL ARCO DE META ----
+    // 1. Si intenta cruzar la línea de meta por los costados (fuera del marco ANCHO_PUERTA_META), lo bloquea el muro invisible
+    float umbralMuroMeta = distTotalXZ - GROSOR_MURO_META;
+    if (avance >= umbralMuroMeta)
+    {
+        if (std::abs(lateral) > ANCHO_PUERTA_META)
+        {
+            if (avancePrevio <= umbralMuroMeta + 0.5f)
+            {
+                // Choca de frente contra la pared invisible lateral de la meta
+                float excesoAvance = avance - umbralMuroMeta;
+                skierPos.x -= dirPista.x * excesoAvance;
+                skierPos.z -= dirPista.y * excesoAvance;
+                avance = umbralMuroMeta;
+                velActual *= 0.25f;
+                tiempoAvisoLimite = ahora;
+            }
+            else
+            {
+                // Si ya está dentro del umbral de la puerta, impide atravesar los postes laterales del marco
+                float limiteMarco = (lateral > 0.0f) ? ANCHO_PUERTA_META : -ANCHO_PUERTA_META;
+                float excesoMarco = lateral - limiteMarco;
+                skierPos.x -= dirDerecha.x * excesoMarco;
+                skierPos.z -= dirDerecha.y * excesoMarco;
+                lateral = limiteMarco;
+            }
+        }
+    }
+
+    // Altura exacta leyendo el triángulo de la malla bajo el esquiador
     float ySuelo = ObtenerAlturaTerreno(terreno, skierPos.x, skierPos.z, skierPos.y - offsetPiesEsquiador);
     skierPos.y = ySuelo + offsetPiesEsquiador;
 
-    // ---- META: solo se gana al cruzar la línea (plano perpendicular a la pista en posMeta) ----
-    if (avance >= distTotalXZ)
+    // Actualizar posición en vivo (1/3, 2/3, 3/3)
+    posicionJugadorActual = CalcularPosicionJugador();
+
+    // ---- META: solo se gana al cruzar dentro del marco de la puerta ----
+    if (avance >= distTotalXZ && std::abs(lateral) <= ANCHO_PUERTA_META)
     {
         estadoCarrera = 2;
         tiempoFinalCarrera = tiempoActualCarrera;
         tiempoMensajeMeta = ahora;
         velActual = 0.0f;
-        std::cout << "META CRUZADA - Tiempo final: " << tiempoFinalCarrera << " seg" << std::endl;
-
         //xcc- desbloquea trofeos al terminar la carrera
         trofeosDesbloqueados[0] = true;
 
@@ -1875,6 +2470,14 @@ void ActualizarCarrera(Model& terreno)
 
         if (nivelActual >= 2)
             trofeosDesbloqueados[2] = true;
+
+        //xcc- conserva la posicion final calculada en la carrera
+        posicionJugadorActual = CalcularPosicionJugador();
+
+        std::cout << "\n==========================================" << std::endl;
+        std::cout << "  META CRUZADA - POSICION: " << posicionJugadorActual << " LUGAR" << std::endl;
+        std::cout << "  Tiempo del Jugador: " << tiempoFinalCarrera << " seg" << std::endl;
+        std::cout << "==========================================\n" << std::endl;
     }
 }
 
@@ -2023,7 +2626,7 @@ static void EnviarBufferHud(Shader& hud, const std::vector<GLfloat>& b, const gl
  * @param escala Tamaño de cada píxel del glifo (en píxeles de pantalla).
  */
 static void DibujarTexto(Shader& hud, const std::string& texto, float x, float y, float escala,
-                         const glm::vec4& color, bool centrado)
+    const glm::vec4& color, bool centrado)
 {
     if (centrado)
     {
@@ -2095,9 +2698,9 @@ void DibujarHUDHub(Shader& hudShader)
     glDisable(GL_DEPTH_TEST);
     hudShader.Use();
 
-    glm::mat4 ortho = glm::ortho( 0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT, 0.0f);
+    glm::mat4 ortho = glm::ortho(0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT, 0.0f);
 
-    glUniformMatrix4fv( glGetUniformLocation(hudShader.Program, "ortho"), 1, GL_FALSE, glm::value_ptr(ortho));
+    glUniformMatrix4fv(glGetUniformLocation(hudShader.Program, "ortho"), 1, GL_FALSE, glm::value_ptr(ortho));
 
     float e = SCREEN_HEIGHT / 800.0f;
 
@@ -2115,26 +2718,27 @@ void DibujarHUDHub(Shader& hudShader)
             DibujarTexto(hudShader, NOMBRES_NIVEL[nivelActual], 0.0f, SCREEN_HEIGHT * 0.42f, 6.0f * e, glm::vec4(1.0f, 0.75f, 0.35f, aNivel), true);
 
         //xcc- muestra las opciones de equipamiento
-        DibujarTexto( hudShader, "EQUIPAMIENTO: 4 5 6", 20.0f * e, 100.0f * e, 3.0f * e, glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), false);
+        DibujarTexto(hudShader, "EQUIPAMIENTO: 4 5 6", 20.0f * e, 100.0f * e, 3.0f * e, glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), false);
 
         //xcc- muestra el equipamiento actual
-        DibujarTexto( hudShader, NOMBRES_EQUIPAMIENTO[equipamientoSeleccionado], 20.0f * e, 140.0f * e, 3.0f * e, glm::vec4(1.0f, 0.85f, 0.4f, 1.0f),false);
+        DibujarTexto(hudShader, NOMBRES_EQUIPAMIENTO[equipamientoSeleccionado], 20.0f * e, 140.0f * e, 3.0f * e, glm::vec4(1.0f, 0.85f, 0.4f, 1.0f), false);
     }
 
     //xcc- muestra aviso cerca de la salida a pista
     if (CercaSalidaPista())
     {
-        DibujarTexto( hudShader, "PRESIONA E PARA IR A PISTA",0.0f, SCREEN_HEIGHT - 70.0f * e, 3.0f * e, glm::vec4(0.0, 0.0, 0.0, 1.0f), true);
+        DibujarTexto(hudShader, "PRESIONA E PARA IR A PISTA", 0.0f, SCREEN_HEIGHT - 70.0f * e, 3.0f * e, glm::vec4(0.0, 0.0, 0.0, 1.0f), true);
     }
 
     //xcc- muestra aviso cerca de la entrada a trofeos
     if (CercaEntradaTrofeos())
     {
-        DibujarTexto( hudShader, "PRESIONA E PARA IR A TROFEOS",0.0f, SCREEN_HEIGHT - 70.0f * e, 3.0f * e, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), true);
+        DibujarTexto(hudShader, "PRESIONA E PARA IR A TROFEOS",
+            0.0f, SCREEN_HEIGHT - 70.0f * e, 3.0f * e,
+            glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), true);
     }
 
-        glEnable(GL_DEPTH_TEST);
-   
+    glEnable(GL_DEPTH_TEST);
 }
 
 //xcc- muestra el aviso para regresar al Hub
@@ -2177,6 +2781,9 @@ void DibujarHUD(Shader& hudShader)
     {
         std::snprintf(buf, sizeof(buf), "TIEMPO: %.2f", tiempoActualCarrera);
         DibujarTexto(hudShader, buf, 0.0f, 20.0f * e, 4.0f * e, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), true);
+
+        std::snprintf(buf, sizeof(buf), "POSICION: %d / 3", posicionJugadorActual);
+        DibujarTexto(hudShader, buf, SCREEN_WIDTH - 260.0f * e, 20.0f * e, 3.5f * e, glm::vec4(1.0f, 0.85f, 0.25f, 1.0f), false);
     }
 
     // Indicaciones en la salida
@@ -2202,7 +2809,7 @@ void DibujarHUD(Shader& hudShader)
     if (aVentisca > 0.0f)
         DibujarTexto(hudShader, ventiscaActiva ? "VENTISCA ACTIVADA" : "VENTISCA DESACTIVADA", 0.0f, SCREEN_HEIGHT * 0.54f, 5.0f * e, glm::vec4(0.8f, 0.9f, 1.0f, aVentisca), true);
 
-    
+
     // Aviso de choque con un obstáculo
     float aChoque = AlphaMensaje(tiempoAvisoChoque, 0.1f, 0.7f);
     if (aChoque > 0.0f && estadoCarrera == 1)
@@ -2213,14 +2820,45 @@ void DibujarHUD(Shader& hudShader)
     if (aLimite > 0.0f && estadoCarrera == 1)
         DibujarTexto(hudShader, "LIMITE DE PISTA", 0.0f, SCREEN_HEIGHT * 0.75f, 4.0f * e, glm::vec4(1.0f, 0.25f, 0.2f, aLimite), true);
 
-    // Resultado en META: permanece 5 s y se desvanece gradualmente
-    float aMeta = AlphaMensaje(tiempoMensajeMeta, TIEMPO_MENSAJE_META, TIEMPO_DESVANECER);
+    // Resultado en META con tabla de posiciones de los 3 esquiadores
+    float aMeta = AlphaMensaje(tiempoMensajeMeta, TIEMPO_MENSAJE_META + 3.0f, TIEMPO_DESVANECER);
     if (aMeta > 0.0f)
     {
-        DibujarTexto(hudShader, "META!", 0.0f, SCREEN_HEIGHT * 0.25f, 12.0f * e, glm::vec4(1.0f, 0.85f, 0.2f, aMeta), true);
-        std::snprintf(buf, sizeof(buf), "TIEMPO FINAL: %.2f SEG", tiempoFinalCarrera);
-        DibujarTexto(hudShader, buf, 0.0f, SCREEN_HEIGHT * 0.45f, 6.0f * e, glm::vec4(1.0f, 1.0f, 1.0f, aMeta), true);
-        DibujarTexto(hudShader, "T: VOLVER A LA SALIDA", 0.0f, SCREEN_HEIGHT * 0.58f, 3.0f * e, glm::vec4(0.9f, 0.9f, 0.9f, aMeta), true);
+        int miLugar = CalcularPosicionJugador();
+        std::snprintf(buf, sizeof(buf), "META! - %d LUGAR!", miLugar);
+        DibujarTexto(hudShader, buf, 0.0f, SCREEN_HEIGHT * 0.18f, 9.0f * e, glm::vec4(1.0f, 0.85f, 0.2f, aMeta), true);
+
+        // Armar y ordenar la tabla de los 3 competidores
+        glm::vec2 vecTotalXZ(posMeta.x - posSalida.x, posMeta.z - posSalida.z);
+        float distTotalXZ = glm::max(glm::length(vecTotalXZ), 1.0f);
+
+        std::vector<ResultadoCompetidor> tabla(3);
+        tabla[0] = { "JUGADOR", true, tiempoFinalCarrera, distTotalXZ };
+        for (int r = 0; r < NUM_CONTRINCANTES; r++)
+        {
+            double tEst = contrincantes[r].terminoCarrera
+                ? contrincantes[r].tiempoFinal
+                : tiempoActualCarrera + (distTotalXZ - contrincantes[r].avanceActual) / glm::max(contrincantes[r].velActual, 10.0f);
+            tabla[r + 1] = { contrincantes[r].nombre, contrincantes[r].terminoCarrera, tEst, contrincantes[r].avanceActual };
+        }
+
+        // Ordenar del menor tiempo al mayor tiempo
+        for (size_t i = 0; i < tabla.size(); i++)
+            for (size_t j = i + 1; j < tabla.size(); j++)
+                if (tabla[j].tiempo < tabla[i].tiempo)
+                    std::swap(tabla[i], tabla[j]);
+
+        // Dibujar 1°, 2° y 3° lugar en pantalla
+        for (int i = 0; i < 3; i++)
+        {
+            std::snprintf(buf, sizeof(buf), "%d LUGAR: %s - %.2f SEG", i + 1, tabla[i].nombre.c_str(), tabla[i].tiempo);
+            glm::vec4 colFila = (tabla[i].nombre == "JUGADOR")
+                ? glm::vec4(0.35f, 1.0f, 0.45f, aMeta)
+                : glm::vec4(1.0f, 1.0f, 1.0f, aMeta);
+            DibujarTexto(hudShader, buf, 0.0f, SCREEN_HEIGHT * (0.36f + i * 0.09f), 4.2f * e, colFila, true);
+        }
+
+        DibujarTexto(hudShader, "T: VOLVER A LA SALIDA", 0.0f, SCREEN_HEIGHT * 0.68f, 3.0f * e, glm::vec4(0.9f, 0.9f, 0.9f, aMeta), true);
     }
 
     glEnable(GL_DEPTH_TEST);
@@ -2316,6 +2954,24 @@ void DoMovement()
 
     }
 
+    // --- CÁLCULO DE ANIMACIONES DEL ESQUIADOR ---
+    if (estadoCarrera == 1) {
+        tiempoAnim += deltaTime * (velActual * 0.2f);
+        oscilacionPiernas = std::sin(tiempoAnim * 15.0f) * (12.0f * (velActual / ambienteActual.velocidadDescenso));
+    }
+    else {
+        oscilacionPiernas = 0.0f;
+    }
+
+    float objetivoInclinacionLat = 0.0f;
+    if (keys[GLFW_KEY_D] || keys[GLFW_KEY_RIGHT]) objetivoInclinacionLat = 18.0f;
+    if (keys[GLFW_KEY_A] || keys[GLFW_KEY_LEFT])  objetivoInclinacionLat = -18.0f;
+    inclinacionLateral = Suavizar(inclinacionLateral, objetivoInclinacionLat, 10.0f, deltaTime);
+
+    float objetivoInclinacionTorso = 0.0f;
+    if (keys[GLFW_KEY_W] || keys[GLFW_KEY_UP])     objetivoInclinacionTorso = 8.0f;
+    if (keys[GLFW_KEY_S] || keys[GLFW_KEY_DOWN])  objetivoInclinacionTorso = -10.0f;
+    inclinacionTorso = Suavizar(inclinacionTorso, objetivoInclinacionTorso, 8.0f, deltaTime);
     // Niebla manual: se suma al valor del nivel (limitada en el render)
     if (keys[GLFW_KEY_N])
         ajusteNieblaManual = glm::min(ajusteNieblaManual + 0.00005f, 0.02f);
@@ -2337,6 +2993,12 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         else if (action == GLFW_RELEASE) keys[key] = false;
     }
 
+    // Cambio de traje: solo en el Hub y cerca del panel de configuración
+    if (key == GLFW_KEY_E && action == GLFW_PRESS && escenaActual == ESCENA_HUB && CercaPanelConfiguracion())
+    {
+        indiceTrajeActual = (indiceTrajeActual + 1) % (int)opcionesTrajes.size();
+        std::cout << ">>> ¡Cambiando de atuendo! Índice actual: " << indiceTrajeActual << std::endl;
+    }
 
     //xcc- cambia del Hub a la pista cerca de la salida donde dice "pista"
     if (key == GLFW_KEY_E && action == GLFW_PRESS && escenaActual == ESCENA_HUB && CercaSalidaPista())
@@ -2348,7 +3010,12 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         estadoCarrera = 0;
         velActual = 0.0f;
 
+        // La pista arranca con la dificultad elegida en el Hub (sin transición)
+        ambienteActual = NIVELES[nivelActual];
+
         std::cout << "Cambio de escena: Hub -> Pista" << std::endl;
+
+        reiniciarContrincantes = true;
     }
 
     //xcc- cambia del Hub a la sala de trofeos
@@ -2432,6 +3099,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         tiempoAyudaControles = glfwGetTime();
         tiempoMensajeMeta = -1.0;
         std::cout << ">>> INICIA EL DESCENSO DE SLALOM" << std::endl;
+        reiniciarContrincantes = true;
     }
 
     // Regreso a la salida
@@ -2443,6 +3111,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         tiempoActualCarrera = 0.0;
         tiempoMensajeMeta = -1.0;
         std::cout << ">>> Esquiador posicionado en la puerta de Salida (START)." << std::endl;
+        reiniciarContrincantes = true;
     }
 
     // Niveles de dificultad y clima (la transición se interpola en ActualizarAmbiente)
@@ -2458,7 +3127,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 
             std::cout << "Seleccion en Hub: " << NOMBRES_NIVEL[nivelActual] << std::endl;
         }
-  
+
     }
 
     //xcc- selecciona equipamiento desde el panel del Hub
@@ -2473,21 +3142,21 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 /**
  * @brief Callback de mouse: orienta la cámara de inspección.
  */
-    void MouseCallback(GLFWwindow* window, double xPos, double yPos)
+void MouseCallback(GLFWwindow* window, double xPos, double yPos)
+{
+    if (firstMouse)
     {
-        if (firstMouse)
-        {
-            lastX = (GLfloat)xPos;
-            lastY = (GLfloat)yPos;
-            firstMouse = false;
-        }
-
-        GLfloat xOffset = (GLfloat)xPos - lastX;
-        GLfloat yOffset = lastY - (GLfloat)yPos;
-
         lastX = (GLfloat)xPos;
         lastY = (GLfloat)yPos;
-
-        if (modoCamara == 0)
-            camera.ProcessMouseMovement(xOffset, yOffset);
+        firstMouse = false;
     }
+
+    GLfloat xOffset = (GLfloat)xPos - lastX;
+    GLfloat yOffset = lastY - (GLfloat)yPos;
+
+    lastX = (GLfloat)xPos;
+    lastY = (GLfloat)yPos;
+
+    if (modoCamara == 0)
+        camera.ProcessMouseMovement(xOffset, yOffset);
+}
