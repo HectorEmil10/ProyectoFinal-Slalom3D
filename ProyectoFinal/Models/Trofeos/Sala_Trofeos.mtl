@@ -121,16 +121,6 @@ d 1.000000
 illum 2
 map_Kd Texturas/Logro_Explorador.png
 
-newmtl Logro_Maestro
-Ns 15.000002
-Ka 1.000000 1.000000 1.000000
-Ks 0.070000 0.070000 0.070000
-Ke 0.000000 0.000000 0.000000
-Ni 1.500000
-d 1.000000
-illum 2
-map_Kd Texturas/Logro_Maestro.png
-
 newmtl Logro_Perfecto
 Ns 15.000002
 Ka 1.000000 1.000000 1.000000
@@ -160,16 +150,6 @@ Ni 1.500000
 d 1.000000
 illum 2
 map_Kd Texturas/Logro_Record.png
-
-newmtl Logro_Tormenta
-Ns 15.000002
-Ka 1.000000 1.000000 1.000000
-Ks 0.070000 0.070000 0.070000
-Ke 0.000000 0.000000 0.000000
-Ni 1.500000
-d 1.000000
-illum 2
-map_Kd Texturas/Logro_Tormenta.png
 
 newmtl Logro_Velocidad
 Ns 15.000002
@@ -371,46 +351,6 @@ illum 2
 map_Kd Texturas/TrofeoModelo_Azul_1.png
 map_d Texturas/TrofeoModelo_Azul_1.png
 
-newmtl TrofeoModelo_Bronce_0
-Ns 15.000002
-Ka 1.000000 1.000000 1.000000
-Ks 0.070000 0.070000 0.070000
-Ke 0.000000 0.000000 0.000000
-Ni 1.500000
-illum 2
-map_Kd Texturas/TrofeoModelo_Bronce_0.png
-map_d Texturas/TrofeoModelo_Bronce_0.png
-
-newmtl TrofeoModelo_Bronce_1
-Ns 15.000002
-Ka 1.000000 1.000000 1.000000
-Ks 0.070000 0.070000 0.070000
-Ke 0.000000 0.000000 0.000000
-Ni 1.500000
-illum 2
-map_Kd Texturas/TrofeoModelo_Bronce_1.png
-map_d Texturas/TrofeoModelo_Bronce_1.png
-
-newmtl TrofeoModelo_Cristal_0
-Ns 15.000002
-Ka 1.000000 1.000000 1.000000
-Ks 0.070000 0.070000 0.070000
-Ke 0.000000 0.000000 0.000000
-Ni 1.500000
-illum 2
-map_Kd Texturas/TrofeoModelo_Cristal_0.png
-map_d Texturas/TrofeoModelo_Cristal_0.png
-
-newmtl TrofeoModelo_Cristal_1
-Ns 15.000002
-Ka 1.000000 1.000000 1.000000
-Ks 0.070000 0.070000 0.070000
-Ke 0.000000 0.000000 0.000000
-Ni 1.500000
-illum 2
-map_Kd Texturas/TrofeoModelo_Cristal_1.png
-map_d Texturas/TrofeoModelo_Cristal_1.png
-
 newmtl TrofeoModelo_Oro_0
 Ns 15.000002
 Ka 1.000000 1.000000 1.000000
@@ -451,47 +391,47 @@ illum 2
 map_Kd Texturas/TrofeoModelo_Plata_1.png
 map_d Texturas/TrofeoModelo_Plata_1.png
 
-newmtl TrofeoModelo_Rojo_0
-Ns 15.000002
-Ka 1.000000 1.000000 1.000000
-Ks 0.070000 0.070000 0.070000
-Ke 0.000000 0.000000 0.000000
-Ni 1.500000
-illum 2
-map_Kd Texturas/TrofeoModelo_Rojo_0.png
-map_d Texturas/TrofeoModelo_Rojo_0.png
-
-newmtl TrofeoModelo_Rojo_1
-Ns 15.000002
-Ka 1.000000 1.000000 1.000000
-Ks 0.070000 0.070000 0.070000
-Ke 0.000000 0.000000 0.000000
-Ni 1.500000
-illum 2
-map_Kd Texturas/TrofeoModelo_Rojo_1.png
-map_d Texturas/TrofeoModelo_Rojo_1.png
-
-newmtl TrofeoModelo_Verde_0
-Ns 15.000002
-Ka 1.000000 1.000000 1.000000
-Ks 0.070000 0.070000 0.070000
-Ke 0.000000 0.000000 0.000000
-Ni 1.500000
-illum 2
-map_Kd Texturas/TrofeoModelo_Verde_0.png
-map_d Texturas/TrofeoModelo_Verde_0.png
-
-newmtl TrofeoModelo_Verde_1
-Ns 15.000002
-Ka 1.000000 1.000000 1.000000
-Ks 0.070000 0.070000 0.070000
-Ke 0.000000 0.000000 0.000000
-Ni 1.500000
-illum 2
-map_Kd Texturas/TrofeoModelo_Verde_1.png
-map_d Texturas/TrofeoModelo_Verde_1.png
-
 newmtl VIDRIO_RGBA_OPENGL
+Ns 50.000011
+Ka 1.000000 1.000000 1.000000
+Ks 0.100000 0.100000 0.100000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Vidrio_RGBA_Transparente.png
+
+newmtl VIDRIO_RGBA_OPENGL.001
+Ns 50.000011
+Ka 1.000000 1.000000 1.000000
+Ks 0.100000 0.100000 0.100000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Vidrio_RGBA_Transparente.png
+
+newmtl VIDRIO_RGBA_OPENGL.002
+Ns 50.000011
+Ka 1.000000 1.000000 1.000000
+Ks 0.100000 0.100000 0.100000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Vidrio_RGBA_Transparente.png
+
+newmtl VIDRIO_RGBA_OPENGL.003
+Ns 50.000011
+Ka 1.000000 1.000000 1.000000
+Ks 0.100000 0.100000 0.100000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Vidrio_RGBA_Transparente.png
+
+newmtl VIDRIO_RGBA_OPENGL.004
 Ns 50.000011
 Ka 1.000000 1.000000 1.000000
 Ks 0.100000 0.100000 0.100000
