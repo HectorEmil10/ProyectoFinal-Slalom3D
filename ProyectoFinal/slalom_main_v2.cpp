@@ -220,6 +220,17 @@ struct Obstaculo
 };
 
 /**
+ * @brief Puerta de slalom detectada automáticamente en la malla.
+ */
+struct PuertaSlalom
+{
+    glm::vec2 posteIzq;   // Posición XZ del primer poste
+    glm::vec2 posteDer;   // Posición XZ del segundo poste
+    float     y;          // Altura del terreno en el centro (solo depuración)
+    bool      cruzada;
+};
+
+/**
  * @brief Copo de nieve en coordenadas de pantalla normalizadas.
  */
 struct Copo
@@ -360,6 +371,14 @@ bool reconstruirLimites = false;                      // Se activa al mover sali
 // ---- Obstáculos ----
 std::vector<Obstaculo> obstaculos;                    // Árboles y rocas detectados en el modelo
 bool mostrarColisionadores = false;                   // Depuración (F3)
+
+// ---- Puertas de Slalom (Detección de paso) ----
+std::vector<PuertaSlalom> puertas;
+int puertasCruzadasCorrectamente = 0;
+bool registrarPoste = false;          // Solicitud de la tecla G (la atiende main)
+bool hayPostePendiente = false;       // true si ya se guardó el primer poste
+glm::vec2 postePendiente(0.0f);       // Primer poste de la puerta en construcción
+std::string lineasPuertas;            // Líneas acumuladas para pegar en CargarPuertasDefinidas()
 
 // ---- Ventisca ----
 std::vector<Copo> copos;                              // Copos de nieve
@@ -1010,6 +1029,8 @@ bool ColisionMueblesTrofeos(glm::vec3 posicion)
 void DoMovement();
 
 // ---- Lógica del juego ----
+void CargarPuertasDefinidas(Model& terreno);
+void RegistrarPoste(Model& terreno);
 void  ActualizarCarrera(Model& terreno);
 void  ActualizarAmbiente(float dt);
 float ObtenerAlturaTerreno(Model& terreno, float x, float z, float yActual);
@@ -1249,6 +1270,8 @@ int main()
     // Colisionadores de árboles y rocas (detección automática desde la malla)
     ConstruirColisionadores(PistaCompleta);
 
+    CargarPuertasDefinidas(PistaCompleta);
+
     // Copos de nieve para la ventisca
     InicializarCopos();
 
@@ -1266,6 +1289,12 @@ int main()
         lastFrame = currentFrame;
 
         glfwPollEvents();
+
+        if (registrarPoste)
+        {
+            RegistrarPoste(PistaCompleta);
+            registrarPoste = false;
+        }
 
         // Reinicio de contrincantes solicitado desde el teclado (E, R, T)
         if (reiniciarContrincantes)
@@ -1590,6 +1619,23 @@ int main()
                         glUniform3fv(colorShader.uniformColor, 1, glm::value_ptr(colorCian));
                         glDrawArrays(GL_TRIANGLES, 0, 36);
                     }
+                }
+
+                // Puertas de slalom: amarillo = pendiente, blanco = ya cruzada
+                for (size_t i = 0; i < puertas.size(); i++)
+                {
+                    const PuertaSlalom& pu = puertas[i];
+                    glm::vec2 d = pu.posteDer - pu.posteIzq;
+                    glm::vec2 m = (pu.posteIzq + pu.posteDer) * 0.5f;
+
+                    glm::mat4 modelPuerta = glm::translate(glm::mat4(1.0f), glm::vec3(m.x, pu.y + 2.0f, m.y));
+                    modelPuerta = glm::rotate(modelPuerta, std::atan2(d.x, d.y), glm::vec3(0.0f, 1.0f, 0.0f));
+                    modelPuerta = glm::scale(modelPuerta, glm::vec3(0.3f, 4.0f, glm::length(d)));
+                    glUniformMatrix4fv(colorModelLoc, 1, GL_FALSE, glm::value_ptr(modelPuerta));
+
+                    glm::vec3 colorPuerta = pu.cruzada ? glm::vec3(1.0f, 1.0f, 1.0f) : glm::vec3(1.0f, 0.9f, 0.1f);
+                    glUniform3fv(colorShader.uniformColor, 1, glm::value_ptr(colorPuerta));
+                    glDrawArrays(GL_TRIANGLES, 0, 36);
                 }
 
                 glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -2186,6 +2232,129 @@ bool ResolverColisiones(const glm::vec2& dirPista)
     return hubo;
 }
 
+/** @brief Agrega una puerta definida por la posición XZ de sus dos postes. */
+void AgregarPuerta(Model& terreno, float x1, float z1, float x2, float z2)
+{
+    PuertaSlalom p;
+    p.posteIzq = glm::vec2(x1, z1);
+    p.posteDer = glm::vec2(x2, z2);
+    p.cruzada = false;
+    glm::vec2 medio = (p.posteIzq + p.posteDer) * 0.5f;
+    p.y = ObtenerAlturaTerreno(terreno, medio.x, medio.y, posSalida.y);
+    puertas.push_back(p);
+}
+
+/** @brief Puertas fijas del circuito. Pega aquí las líneas que imprime la tecla G. */
+void CargarPuertasDefinidas(Model& terreno)
+{
+    puertas.clear();
+    puertasCruzadasCorrectamente = 0;
+    AgregarPuerta(terreno, -192.74f, 31.93f, -192.07f, 21.20f);
+    AgregarPuerta(terreno, -172.25f, 24.36f, -171.76f, 35.84f);
+    AgregarPuerta(terreno, -142.10f, 35.62f, -142.49f, 46.41f);
+    AgregarPuerta(terreno, -117.24f, 31.82f, -116.60f, 42.66f);
+    AgregarPuerta(terreno, -89.31f, 8.13f, -83.95f, 16.34f);
+    AgregarPuerta(terreno, -74.36f, -15.55f, -64.75f, -10.18f);
+    AgregarPuerta(terreno, -25.88f, -35.61f, -23.47f, -24.96f);
+    AgregarPuerta(terreno, -2.99f, -38.09f, -1.83f, -28.18f);
+    AgregarPuerta(terreno, 27.59f, -34.96f, 29.65f, -24.69f);
+    AgregarPuerta(terreno, 65.98f, -29.15f, 66.74f, -40.40f);
+    AgregarPuerta(terreno, 102.91f, -25.20f, 103.73f, -13.94f);
+    AgregarPuerta(terreno, 132.06f, -10.96f, 133.86f, -20.68f);
+    AgregarPuerta(terreno, 161.08f, -12.79f, 165.20f, -2.68f);
+    AgregarPuerta(terreno, 210.17f, 0.73f, 210.37f, 11.44f);
+    
+        
+
+    // Ejemplo (reemplázalo con tus coordenadas):
+        
+
+    std::cout << "[Puertas] Puertas cargadas: " << puertas.size() << std::endl;
+}
+
+
+/**
+ * @brief Con la tecla G se guarda la posición activa como poste: la del esquiador
+ *        (3ª persona) o la de la cámara libre. Cada dos postes forman una puerta
+ *        y se imprime la línea nueva y la lista acumulada.
+ */
+void RegistrarPoste(Model& terreno)
+{
+    glm::vec3 c = (modoCamara == 1) ? skierPos : camera.GetPosition();
+    glm::vec2 punto(c.x, c.z);
+
+    std::printf("[Puertas] Poste en x=%.2f  z=%.2f\n", punto.x, punto.y);
+
+    if (!hayPostePendiente)
+    {
+        postePendiente = punto;
+        hayPostePendiente = true;
+        std::cout << "[Puertas] Poste 1 guardado. Ve al otro poste y pulsa G." << std::endl;
+        return;
+    }
+
+    // Evita registrar los dos postes en el mismo lugar
+    if (glm::distance(punto, postePendiente) < 1.5f)
+    {
+        std::cout << "[Puertas] El 2o poste esta pegado al 1o. Muevete al otro poste y pulsa G." << std::endl;
+        return;
+    }
+
+    hayPostePendiente = false;
+    AgregarPuerta(terreno, postePendiente.x, postePendiente.y, punto.x, punto.y);
+
+    char linea[160];
+    std::snprintf(linea, sizeof(linea), "    AgregarPuerta(terreno, %.2ff, %.2ff, %.2ff, %.2ff);\n",
+        postePendiente.x, postePendiente.y, punto.x, punto.y);
+    lineasPuertas += linea;
+
+    std::printf("\n[Puertas] Linea nueva:\n%s", linea);
+    std::printf("[Puertas] ===== TODAS LAS PUERTAS DE ESTA SESION =====\n%s[Puertas] ===== FIN =====\n\n",
+        lineasPuertas.c_str());
+}
+
+/** @brief Indica si el segmento p1-p2 cruza al segmento q1-q2 (plano XZ). */
+static bool SegmentosSeCruzan(const glm::vec2& p1, const glm::vec2& p2, const glm::vec2& q1, const glm::vec2& q2)
+{
+    glm::vec2 r = p2 - p1;
+    glm::vec2 s = q2 - q1;
+    float den = r.x * s.y - r.y * s.x;
+    if (std::abs(den) < 1e-6f)
+        return false;   // Paralelos
+
+    glm::vec2 qp = q1 - p1;
+    float t = (qp.x * s.y - qp.y * s.x) / den;
+    float u = (qp.x * r.y - qp.y * r.x) / den;
+    return t >= 0.0f && t <= 1.0f && u >= 0.0f && u <= 1.0f;
+}
+
+/**
+ * @brief Cuenta una puerta cuando la trayectoria del esquiador en este cuadro
+ *        atraviesa el segmento entre sus dos postes.
+ * @param posAnterior Posición del esquiador al inicio del cuadro.
+ */
+void EvaluarPuertasSlalom(const glm::vec3& posAnterior)
+{
+    glm::vec2 a(posAnterior.x, posAnterior.z);
+    glm::vec2 b(skierPos.x, skierPos.z);
+    if (a == b)
+        return;
+
+    for (size_t i = 0; i < puertas.size(); i++)
+    {
+        if (puertas[i].cruzada)
+            continue;
+
+        if (SegmentosSeCruzan(a, b, puertas[i].posteIzq, puertas[i].posteDer))
+        {
+            puertas[i].cruzada = true;
+            puertasCruzadasCorrectamente++;
+            std::cout << ">>> Puerta " << i + 1 << " cruzada! (Total: "
+                << puertasCruzadasCorrectamente << "/" << puertas.size() << ")" << std::endl;
+        }
+    }
+}
+
 // ----------------------------------------------------------------------------
 //  7.4 Lógica del juego
 // ----------------------------------------------------------------------------
@@ -2481,6 +2650,7 @@ void ActualizarCarrera(Model& terreno)
 
     // Avance previo antes de mover este fotograma (para las paredes invisibles de la meta)
     float avancePrevio = glm::dot(glm::vec2(skierPos.x - posSalida.x, skierPos.z - posSalida.z), dirPista);
+    glm::vec3 posAnterior = skierPos;   // Para detectar el cruce de puertas
 
     // Avance en XZ sobre el eje de la pista
     skierPos.x += dirPista.x * velActual * deltaTime;
@@ -2513,6 +2683,9 @@ void ActualizarCarrera(Model& terreno)
         velActual = glm::min(velActual, ambienteActual.velocidadDescenso * FACTOR_VEL_CHOQUE);
         tiempoAvisoChoque = ahora;
     }
+
+    // Evaluar paso por las puertas
+    EvaluarPuertasSlalom(posAnterior);
 
     // Proyección longitudinal (avance) y lateral respecto al eje Salida -> Meta
     glm::vec2 relativo(skierPos.x - posSalida.x, skierPos.z - posSalida.z);
@@ -2775,6 +2948,21 @@ static void DibujarTexto(Shader& hud, const std::string& texto, float x, float y
 }
 
 /**
+ * @brief Dibuja un texto alineado a la derecha: mide el ancho real del texto y
+ *        lo coloca a margenDer píxeles del borde derecho, así nunca se sale
+ *        de la pantalla sin importar la longitud ni la resolución.
+ */
+static void DibujarTextoDerecha(Shader& hud, const std::string& texto, float margenDer, float y, float escala,
+    const glm::vec4& color)
+{
+    float ancho = texto.size() * 6.0f * escala - escala;
+    float x = (float)SCREEN_WIDTH - ancho - margenDer;
+    if (x < 0.0f)
+        x = 0.0f;
+    DibujarTexto(hud, texto, x, y, escala, color, false);
+}
+
+/**
  * @brief Dibuja la ventisca sobre la pantalla: un velo blanquecino y tres
  *        capas de copos (lejanos, medios y cercanos) con estela proporcional
  *        a la velocidad del viento.
@@ -2947,7 +3135,11 @@ void DibujarHUD(Shader& hudShader)
         DibujarTexto(hudShader, buf, 0.0f, 20.0f * e, 4.0f * e, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), true);
 
         std::snprintf(buf, sizeof(buf), "POSICION: %d / 3", posicionJugadorActual);
-        DibujarTexto(hudShader, buf, SCREEN_WIDTH - 260.0f * e, 20.0f * e, 3.5f * e, glm::vec4(1.0f, 0.85f, 0.25f, 1.0f), false);
+        DibujarTextoDerecha(hudShader, buf, 30.0f * e, 20.0f * e, 3.5f * e, glm::vec4(1.0f, 0.85f, 0.25f, 1.0f));
+
+        // Marcador de puertas cruzadas en vivo (verde), debajo de la posición
+        std::snprintf(buf, sizeof(buf), "PUERTAS: %d / %d", puertasCruzadasCorrectamente, (int)puertas.size());
+        DibujarTextoDerecha(hudShader, buf, 30.0f * e, 60.0f * e, 3.5f * e, glm::vec4(0.35f, 1.0f, 0.45f, 1.0f));
     }
 
     // Indicaciones en la salida
@@ -2991,6 +3183,10 @@ void DibujarHUD(Shader& hudShader)
         int miLugar = CalcularPosicionJugador();
         std::snprintf(buf, sizeof(buf), "META! - %d LUGAR!", miLugar);
         DibujarTexto(hudShader, buf, 0.0f, SCREEN_HEIGHT * 0.18f, 9.0f * e, glm::vec4(1.0f, 0.85f, 0.2f, aMeta), true);
+
+        // Total de puertas completadas en los resultados finales
+        std::snprintf(buf, sizeof(buf), "PUERTAS COMPLETADAS: %d / %d", puertasCruzadasCorrectamente, (int)puertas.size());
+        DibujarTexto(hudShader, buf, 0.0f, SCREEN_HEIGHT * 0.26f, 4.0f * e, glm::vec4(0.35f, 1.0f, 0.45f, aMeta), true);
 
         // Armar y ordenar la tabla de los 3 competidores
         glm::vec2 vecTotalXZ(posMeta.x - posSalida.x, posMeta.z - posSalida.z);
@@ -3297,6 +3493,10 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         std::cout << "Ventisca: " << (ventiscaActiva ? "activada" : "desactivada") << std::endl;
     }
 
+    // Registro de postes de puertas: cámara libre (C) dentro de la pista
+    if (key == GLFW_KEY_G && action == GLFW_PRESS && escenaActual == ESCENA_PISTA)
+        registrarPoste = true;
+
     // Inicio de carrera
 
     //xcc- inicia la carrera solo desde la pista
@@ -3314,6 +3514,12 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         tiempoMensajeMeta = -1.0;
         std::cout << ">>> INICIA EL DESCENSO DE SLALOM" << std::endl;
         reiniciarContrincantes = true;
+
+        puertasCruzadasCorrectamente = 0;
+        for (size_t i = 0; i < puertas.size(); i++)
+        {
+            puertas[i].cruzada = false;
+        }
     }
 
     // Regreso a la salida
@@ -3326,6 +3532,12 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         tiempoMensajeMeta = -1.0;
         std::cout << ">>> Esquiador posicionado en la puerta de Salida (START)." << std::endl;
         reiniciarContrincantes = true;
+
+        puertasCruzadasCorrectamente = 0;
+        for (size_t i = 0; i < puertas.size(); i++)
+        {
+            puertas[i].cruzada = false;
+        }
     }
 
     // Niveles de dificultad y clima (la transición se interpola en ActualizarAmbiente)
