@@ -137,6 +137,12 @@ const float TIEMPO_MENSAJE_META = 5.0f;    // Tiempo que permanece el resultado 
 const float TIEMPO_DESVANECER = 2.0f;    // Duración del desvanecimiento posterior
 const float TIEMPO_MENSAJE_CORTO = 1.5f;    // Mensajes breves (salida, cambio de nivel, límite)
 
+
+//xcc- tiempos limite para desbloquear trofeos
+const float TIEMPO_TROFEO_FACIL = 18.0f;
+const float TIEMPO_TROFEO_MEDIO = 15.0f;
+const float TIEMPO_TROFEO_DIFICIL = 12.0f;
+
 // ---- Cielo ----
 // Orden de caras del cubemap: +X, -X, +Y, -Y, +Z, -Z
 const char* CARAS_SKYBOX[6] = {
@@ -2519,14 +2525,26 @@ void ActualizarCarrera(Model& terreno)
         tiempoFinalCarrera = tiempoActualCarrera;
         tiempoMensajeMeta = ahora;
         velActual = 0.0f;
-        //xcc- desbloquea trofeos al terminar la carrera
-        trofeosDesbloqueados[0] = true;
-
-        if (nivelActual >= 1)
+        //xcc- desbloquea trofeo por tiempo en dificultad facil
+        if (nivelActual == 0 && tiempoFinalCarrera <= TIEMPO_TROFEO_FACIL)
+        {
             trofeosDesbloqueados[1] = true;
+            std::cout << "Trofeo desbloqueado: Velocista Facil" << std::endl;
+        }
 
-        if (nivelActual >= 2)
+        //xcc- desbloquea trofeo por tiempo en dificultad media
+        if (nivelActual == 1 && tiempoFinalCarrera <= TIEMPO_TROFEO_MEDIO)
+        {
             trofeosDesbloqueados[2] = true;
+            std::cout << "Trofeo desbloqueado: Velocista Medio" << std::endl;
+        }
+
+        //xcc- desbloquea trofeo por tiempo en dificultad dificil
+        if (nivelActual == 2 && tiempoFinalCarrera <= TIEMPO_TROFEO_DIFICIL)
+        {
+            trofeosDesbloqueados[3] = true;
+            std::cout << "Trofeo desbloqueado: Velocista Dificil" << std::endl;
+        }
 
         //xcc- conserva la posicion final calculada en la carrera
         posicionJugadorActual = CalcularPosicionJugador();
