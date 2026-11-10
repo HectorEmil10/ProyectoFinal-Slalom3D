@@ -137,6 +137,12 @@ const float TIEMPO_MENSAJE_META = 5.0f;    // Tiempo que permanece el resultado 
 const float TIEMPO_DESVANECER = 2.0f;    // Duración del desvanecimiento posterior
 const float TIEMPO_MENSAJE_CORTO = 1.5f;    // Mensajes breves (salida, cambio de nivel, límite)
 
+
+//xcc- tiempos limite para desbloquear trofeos
+const float TIEMPO_TROFEO_FACIL = 18.0f;
+const float TIEMPO_TROFEO_MEDIO = 15.0f;
+const float TIEMPO_TROFEO_DIFICIL = 12.0f;
+
 // ---- Cielo ----
 // Orden de caras del cubemap: +X, -X, +Y, -Y, +Z, -Z
 const char* CARAS_SKYBOX[6] = {
@@ -262,6 +268,10 @@ std::vector<glm::vec3> posicionesTrofeos = {
 
 //xcc- guarda cuales trofeos se han desbloqueado
 bool trofeosDesbloqueados[4] = { false, false, false, false};
+
+//xcc- controla las luces generales de la sala de trofeos
+bool lucesTrofeosCompletas = false;
+
 
 float factorInteriorHub = 0.0f;   // 0 = afuera del Hub, 1 = adentro (suavizado)
 
@@ -551,6 +561,17 @@ bool CercaEntradaTrofeos()
     glm::vec3 posicionCamara = camera.GetPosition();
 
     return posicionCamara.x > 13.0f && posicionCamara.x < 29.0f && posicionCamara.z > -3.0f && posicionCamara.z < 5.0f;
+}
+
+//xcc- verifica si la camara esta cerca del interruptor de trofeos
+bool CercaInterruptorTrofeos()
+{
+    glm::vec3 posicionCamara = camera.GetPosition();
+    glm::vec2 posicionActual(posicionCamara.x, posicionCamara.z);
+    glm::vec2 posicionInterruptor(2.10798f, 11.262f);
+
+    float distancia = glm::length(posicionActual - posicionInterruptor);
+    return distancia < 2.0f;
 }
 
 //xcc- verifica colisiones con los muebles del Hub
@@ -1293,7 +1314,8 @@ int main()
         if (escenaActual == ESCENA_HUB)
         {
             glm::vec3 p = camera.GetPosition();
-            bool dentroHub = (p.z < 19.0f && std::abs(p.x) < 21.0f);   // Mismos límites que DoMovement
+            //xcc- mantiene la iluminacion interior hasta las paredes del Hub
+            bool dentroHub = (p.z < 19.0f && std::abs(p.x) <= 21.0f); // Mismos límites que DoMovement
             factorInteriorHub = Suavizar(factorInteriorHub, dentroHub ? 1.0f : 0.0f, 4.0f, deltaTime);
             esquema = EsquemaHub(currentFrame, nivelActual, factorInteriorHub, esquema);
         }
@@ -1343,8 +1365,11 @@ int main()
             );
 
 
-            //xcc- usa dos luces puntuales dentro de trofeos
-            glUniform1i(glGetUniformLocation(lightingShader.Program, "numPointLights"), 2);
+            //xcc- usa 2 luces del podio o todas las luces de la sala
+            if (lucesTrofeosCompletas)
+                glUniform1i(glGetUniformLocation(lightingShader.Program, "numPointLights"), 6);
+            else
+                glUniform1i(glGetUniformLocation(lightingShader.Program, "numPointLights"), 2);
 
             //xcc- luz izquierda
             glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].position"), -3.0f, 3.5f, 0.0f);
@@ -1363,6 +1388,44 @@ int main()
             glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[1].constant"), 1.0f);
             glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[1].linear"), 0.09f);
             glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[1].quadratic"), 0.032f);
+
+            //xcc- luces generales que se encienden con L
+            if (lucesTrofeosCompletas)
+            {
+                //xcc- luces de la parte media
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[2].position"), -3.0f, 3.5f, 6.0f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[2].ambient"), 0.15f, 0.12f, 0.08f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[2].diffuse"), 0.85f, 0.65f, 0.45f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[2].specular"), 1.0f, 0.85f, 0.65f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[2].constant"), 1.0f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[2].linear"), 0.09f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[2].quadratic"), 0.032f);
+
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[3].position"), 3.0f, 3.5f, 6.0f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[3].ambient"), 0.15f, 0.12f, 0.08f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[3].diffuse"), 0.85f, 0.65f, 0.45f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[3].specular"), 1.0f, 0.85f, 0.65f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[3].constant"), 1.0f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[3].linear"), 0.09f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[3].quadratic"), 0.032f);
+
+                //xcc- luces de la parte nueva
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[4].position"), -3.0f, 3.5f, 10.0f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[4].ambient"), 0.15f, 0.12f, 0.08f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[4].diffuse"), 0.85f, 0.65f, 0.45f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[4].specular"), 1.0f, 0.85f, 0.65f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[4].constant"), 1.0f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[4].linear"), 0.09f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[4].quadratic"), 0.032f);
+
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[5].position"), 3.0f, 3.5f, 10.0f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[5].ambient"), 0.15f, 0.12f, 0.08f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[5].diffuse"), 0.85f, 0.65f, 0.45f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[5].specular"), 1.0f, 0.85f, 0.65f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[5].constant"), 1.0f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[5].linear"), 0.09f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[5].quadratic"), 0.032f);
+            }
 
             //xcc- activa transparencia en la sala de trofeos
             glEnable(GL_BLEND);
@@ -2461,14 +2524,26 @@ void ActualizarCarrera(Model& terreno)
         tiempoFinalCarrera = tiempoActualCarrera;
         tiempoMensajeMeta = ahora;
         velActual = 0.0f;
-        //xcc- desbloquea trofeos al terminar la carrera
-        trofeosDesbloqueados[0] = true;
-
-        if (nivelActual >= 1)
+        //xcc- desbloquea trofeo por tiempo en dificultad facil
+        if (nivelActual == 0 && tiempoFinalCarrera <= TIEMPO_TROFEO_FACIL)
+        {
             trofeosDesbloqueados[1] = true;
+            std::cout << "Trofeo desbloqueado: Velocista Facil" << std::endl;
+        }
 
-        if (nivelActual >= 2)
+        //xcc- desbloquea trofeo por tiempo en dificultad media
+        if (nivelActual == 1 && tiempoFinalCarrera <= TIEMPO_TROFEO_MEDIO)
+        {
             trofeosDesbloqueados[2] = true;
+            std::cout << "Trofeo desbloqueado: Velocista Medio" << std::endl;
+        }
+
+        //xcc- desbloquea trofeo por tiempo en dificultad dificil
+        if (nivelActual == 2 && tiempoFinalCarrera <= TIEMPO_TROFEO_DIFICIL)
+        {
+            trofeosDesbloqueados[3] = true;
+            std::cout << "Trofeo desbloqueado: Velocista Dificil" << std::endl;
+        }
 
         //xcc- conserva la posicion final calculada en la carrera
         posicionJugadorActual = CalcularPosicionJugador();
@@ -2695,7 +2770,15 @@ static void DibujarVentisca(Shader& hud)
 void DibujarHUDHub(Shader& hudShader)
 {
     glDisable(GL_DEPTH_TEST);
+// HEAD
     glEnable(GL_BLEND); // <-- AGREGA ESTA LÍNEA AQUÍ
+//=======
+
+    //xcc- activa transparencia para los textos del Hub
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+//>>>>>>> 1f4a45934444d6aa627f9ff3bc9f8a0cc32858dc
     hudShader.Use();
 
     glm::mat4 ortho = glm::ortho(0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT, 0.0f);
@@ -2738,6 +2821,8 @@ void DibujarHUDHub(Shader& hudShader)
             glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), true);
     }
 
+    //xcc- termina las transparencias del HUD del Hub
+    glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
 }
 
@@ -2745,6 +2830,11 @@ void DibujarHUDHub(Shader& hudShader)
 void DibujarAvisoVolverHub(Shader& hudShader)
 {
     glDisable(GL_DEPTH_TEST);
+
+    //xcc- activa transparencia para los avisos
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     hudShader.Use();
 
     glm::mat4 ortho = glm::ortho(0.0f, (float)SCREEN_WIDTH, 0.0f, (float)SCREEN_HEIGHT);
@@ -2755,12 +2845,29 @@ void DibujarAvisoVolverHub(Shader& hudShader)
     DibujarTexto(hudShader, "PRESIONA H PARA VOLVER AL HUB", 0.0f, 35.0f * e, 2.5f * e,
         glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), true);
 
+    //xcc- muestra el control de luces solo cerca del interruptor
+    if (escenaActual == ESCENA_TROFEOS && CercaInterruptorTrofeos())
+    {
+        if (lucesTrofeosCompletas)
+            DibujarTexto(hudShader, "L - DEJAR SOLO PODIO", 0.0f, 70.0f * e, 2.5f * e,
+                glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), true);
+        else
+            DibujarTexto(hudShader, "L - ENCENDER LUCES", 0.0f, 70.0f * e, 2.5f * e,
+                glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), true);
+    }
+
+    glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
 }
 
 void DibujarHUD(Shader& hudShader)
 {
     glDisable(GL_DEPTH_TEST);
+
+    //xcc- activa transparencias para HUD y ventisca
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     hudShader.Use();
 
     glm::mat4 ortho = glm::ortho(0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT, 0.0f);
@@ -2861,6 +2968,8 @@ void DibujarHUD(Shader& hudShader)
         DibujarTexto(hudShader, "T: VOLVER A LA SALIDA", 0.0f, SCREEN_HEIGHT * 0.68f, 3.0f * e, glm::vec4(0.9f, 0.9f, 0.9f, aMeta), true);
     }
 
+    //xcc- termina las transparencias del HUD
+    glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
 }
 
@@ -2883,6 +2992,7 @@ void DoMovement()
         float velocidadCamara = deltaTime * 12.0f;
         if (escenaActual == ESCENA_TROFEOS)
             velocidadCamara *= 0.35f;   // Sala más pequeña y cámara más baja: sin esto se siente más rápida
+        if (escenaActual == ESCENA_TROFEOS) velocidadCamara *= 0.35f;   // Sala más pequeña y cámara más baja: sin esto se siente más rápida
         if (keys[GLFW_KEY_W] || keys[GLFW_KEY_UP])    camera.ProcessKeyboard(FORWARD, velocidadCamara);
         if (keys[GLFW_KEY_S] || keys[GLFW_KEY_DOWN])  camera.ProcessKeyboard(BACKWARD, velocidadCamara);
         if (keys[GLFW_KEY_A] || keys[GLFW_KEY_LEFT])  camera.ProcessKeyboard(LEFT, velocidadCamara);
@@ -3027,6 +3137,9 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         modoCamara = 0;
         camera.SetPosition(glm::vec3(0.0f, 3.0f, 10.0f));
 
+        //xcc- al entrar solo quedan encendidas las luces del podio
+        lucesTrofeosCompletas = false;
+
         std::cout << "Cambio de escena: Hub -> Trofeos" << std::endl;
     }
 
@@ -3038,6 +3151,17 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         modoCamara = 0;
         camera.SetPosition(glm::vec3(0.0f, 3.0f, 30.0f));
         std::cout << "Cambio de escena: regreso al Hub" << std::endl;
+    }
+
+    //xcc- controla las luces solamente desde el interruptor
+    if (key == GLFW_KEY_L && action == GLFW_PRESS &&
+        escenaActual == ESCENA_TROFEOS && CercaInterruptorTrofeos())
+    {
+        lucesTrofeosCompletas = !lucesTrofeosCompletas;
+
+        std::cout << "Luces de trofeos: "
+            << (lucesTrofeosCompletas ? "encendidas" : "solo podio")
+            << std::endl;
     }
 
     // Cambio de cámara
