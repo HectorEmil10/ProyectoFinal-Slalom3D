@@ -1377,7 +1377,6 @@ int main()
 
             //xcc- desactiva transparencia para los demas objetos
             glUniform1i(glGetUniformLocation(lightingShader.Program, "transparency"), 0);
-            glDisable(GL_BLEND);
         }
 
 
@@ -2696,6 +2695,7 @@ static void DibujarVentisca(Shader& hud)
 void DibujarHUDHub(Shader& hudShader)
 {
     glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND); // <-- AGREGA ESTA LÍNEA AQUÍ
     hudShader.Use();
 
     glm::mat4 ortho = glm::ortho(0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT, 0.0f);
