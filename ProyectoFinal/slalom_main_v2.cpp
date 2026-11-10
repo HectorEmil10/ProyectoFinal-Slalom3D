@@ -557,6 +557,17 @@ bool CercaEntradaTrofeos()
     return posicionCamara.x > 13.0f && posicionCamara.x < 29.0f && posicionCamara.z > -3.0f && posicionCamara.z < 5.0f;
 }
 
+//xcc- verifica si la camara esta cerca del interruptor de trofeos
+bool CercaInterruptorTrofeos()
+{
+    glm::vec3 posicionCamara = camera.GetPosition();
+    glm::vec2 posicionActual(posicionCamara.x, posicionCamara.z);
+    glm::vec2 posicionInterruptor(2.10798f, 11.262f);
+
+    float distancia = glm::length(posicionActual - posicionInterruptor);
+    return distancia < 2.0f;
+}
+
 //xcc- verifica colisiones con los muebles del Hub
 bool ColisionMueblesHub(glm::vec3 posicion)
 {
@@ -2813,11 +2824,11 @@ void DibujarAvisoVolverHub(Shader& hudShader)
     DibujarTexto(hudShader, "PRESIONA H PARA VOLVER AL HUB", 0.0f, 35.0f * e, 2.5f * e,
         glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), true);
 
-    //xcc- muestra el control de las luces en trofeos
-    if (escenaActual == ESCENA_TROFEOS)
+    //xcc- muestra el control de luces solo cerca del interruptor
+    if (escenaActual == ESCENA_TROFEOS && CercaInterruptorTrofeos())
     {
         if (lucesTrofeosCompletas)
-            DibujarTexto(hudShader, "L - SOLO PODIO", 0.0f, 70.0f * e, 2.5f * e,
+            DibujarTexto(hudShader, "L - DEJAR SOLO PODIO", 0.0f, 70.0f * e, 2.5f * e,
                 glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), true);
         else
             DibujarTexto(hudShader, "L - ENCENDER LUCES", 0.0f, 70.0f * e, 2.5f * e,
@@ -2958,6 +2969,7 @@ void DoMovement()
         glm::vec3 posicionAnterior = camera.GetPosition();
 
         float velocidadCamara = deltaTime * 12.0f;
+        if (escenaActual == ESCENA_TROFEOS) velocidadCamara *= 0.35f;   // Sala más pequeña y cámara más baja: sin esto se siente más rápida
         if (keys[GLFW_KEY_W] || keys[GLFW_KEY_UP])    camera.ProcessKeyboard(FORWARD, velocidadCamara);
         if (keys[GLFW_KEY_S] || keys[GLFW_KEY_DOWN])  camera.ProcessKeyboard(BACKWARD, velocidadCamara);
         if (keys[GLFW_KEY_A] || keys[GLFW_KEY_LEFT])  camera.ProcessKeyboard(LEFT, velocidadCamara);
@@ -3118,8 +3130,9 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         std::cout << "Cambio de escena: regreso al Hub" << std::endl;
     }
 
-    //xcc- enciende o apaga las luces generales de trofeos
-    if (key == GLFW_KEY_L && action == GLFW_PRESS && escenaActual == ESCENA_TROFEOS)
+    //xcc- controla las luces solamente desde el interruptor
+    if (key == GLFW_KEY_L && action == GLFW_PRESS &&
+        escenaActual == ESCENA_TROFEOS && CercaInterruptorTrofeos())
     {
         lucesTrofeosCompletas = !lucesTrofeosCompletas;
 
