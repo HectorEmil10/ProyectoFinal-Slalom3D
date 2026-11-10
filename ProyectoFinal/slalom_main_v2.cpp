@@ -118,6 +118,33 @@ const float FRICCION_LIBRE = 0.7f;      // Desaceleración al soltar el avance (
 const float FRENADO = 4.0f;      // Desaceleración al frenar (1/s)
 const float RADIO_ESQUIADOR = 1.1f;      // Radio de colisión del esquiador en el plano XZ
 
+// ---- Articulaciones del esquiador ----
+// Coordenadas ABSOLUTAS en el espacio de los .obj (Y arriba).
+// Conversión desde Blender (Z arriba): (x, y, z)_Blender -> (x, z, -y)
+// Pivote = punto donde la pieza se une a su padre.
+const glm::vec3 PIV_CADERA(-0.093f, 2.09765f, 0.010548f);
+const glm::vec3 PIV_CINTURA(-0.093006f, 2.0831f, 0.010679f);
+const glm::vec3 PIV_PECHO(-0.093264f, 2.48759f, -0.004624f);
+const glm::vec3 PIV_CUELLO(-0.094275f, 3.03322f, -0.04391f);
+const glm::vec3 PIV_CABEZA(-0.079021f, 3.25954f, -0.003005f);
+
+const glm::vec3 PIV_HOMBRO_IZQ(0.347077f, 2.95232f, -0.046983f);
+const glm::vec3 PIV_CODO_IZQ(0.470338f, 2.44909f, -0.05014f);
+const glm::vec3 PIV_MUNECA_IZQ(0.588524f, 1.89387f, -0.043184f);
+const glm::vec3 PIV_HOMBRO_DER(-0.534423f, 2.95017f, -0.031312f);
+const glm::vec3 PIV_CODO_DER(-0.66137f, 2.44762f, -0.00413f);
+const glm::vec3 PIV_MUNECA_DER(-0.777016f, 1.89241f, 0.014972f);
+
+const glm::vec3 PIV_MUSLO_IZQ(0.054624f, 2.00339f, -0.018259f);   // articulación de la cadera
+const glm::vec3 PIV_RODILLA_IZQ(0.081512f, 1.09564f, -0.020852f);
+const glm::vec3 PIV_TOBILLO_IZQ(0.08112f, 0.076162f, -0.011668f);
+const glm::vec3 PIV_MUSLO_DER(-0.242427f, 2.0036f, -0.00772f);
+const glm::vec3 PIV_RODILLA_DER(-0.270705f, 1.09588f, -0.008355f);
+const glm::vec3 PIV_TOBILLO_DER(-0.271096f, 0.076409f, 1.69405);
+
+const glm::vec3 PIV_SKI_IZQ(0.10514f, -0.042328f, 0.26877f);
+const glm::vec3 PIV_SKI_DER(-0.252572f, -0.039645f, 0.252299f);
+
 // ---- Obstáculos (detección automática de árboles y rocas) ----
 const float MAX_ANCHO_OBSTACULO = 14.0f; // Objetos más anchos se ignoran (terreno, carteles)
 const float MIN_ANCHO_OBSTACULO = 0.3f;  // Objetos más angostos se ignoran
@@ -306,6 +333,14 @@ int    estadoCarrera = 0;
 double tiempoInicioCarrera = 0.0;
 double tiempoActualCarrera = 0.0;
 double tiempoFinalCarrera = 0.0;
+
+
+// ---- Variables temporales de prueba ----
+float rotTorso = 0.0f;
+float rotCadera = 0.0f;
+float rotCabeza = 0.0f;
+float rotCodos = 0.0f;
+float rotRodillas = 0.0f;
 
 // ---- Contrincantes y Posiciones ----
 Contrincante contrincantes[NUM_CONTRINCANTES];
@@ -1183,6 +1218,9 @@ int main()
     Model PieDerModel((char*)"Models/Esquiador/pie_der.obj");
     Model PieIzqModel((char*)"Models/Esquiador/pie_izq.obj");
 
+    Model SkiDerModel((char*)"Models/Skis/ski_der.obj");
+    Model SkiIzqModel((char*)"Models/Skis/ski_izq.obj");
+
     GLuint texturaSkybox = CargarSkybox(CARAS_SKYBOX);
     bool hayTexturaSkybox = (texturaSkybox != 0);
     if (!hayTexturaSkybox)
@@ -1585,92 +1623,81 @@ int main()
                     ForzarTexturaEnModelo(AntebrazoDerModel, texTraje);
                     ForzarTexturaEnModelo(ManoDerModel, texTraje);
 
-                    glm::mat4 modelSkier = glm::mat4(1.0f);
-                    modelSkier = glm::translate(modelSkier, posEsq);
-                    modelSkier = glm::rotate(modelSkier, glm::radians(rotYEsq), glm::vec3(0.0f, 1.0f, 0.0f));
+                    // 1. RAÍZ GLOBAL: origen de los .obj a nivel del suelo (los pies)
+                    glm::mat4 raiz = glm::translate(glm::mat4(1.0f), posEsq - glm::vec3(0.0f, offsetPiesEsquiador, 0.0f));
+                    raiz = glm::rotate(raiz, glm::radians(rotYEsq), glm::vec3(0.0f, 1.0f, 0.0f));
 
-                    // --- TREN INFERIOR ---
-                    glm::mat4 modelCaderas = glm::translate(modelSkier, glm::vec3(0.0f, -0.9f, 0.0f));
-                    modelCaderas = glm::rotate(modelCaderas, glm::radians(incLat), glm::vec3(0.0f, 0.0f, 1.0f));
-                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelCaderas));
-                    CaderasModel.Draw(lightingShader);
+                    // Articula: rota 'rot' (grados XYZ) alrededor de 'pivote' (absoluto) heredando al padre
+                    auto Articular = [](const glm::mat4& padre, const glm::vec3& pivote, const glm::vec3& rot)
+                        {
+                            glm::mat4 m = glm::translate(padre, pivote);
+                            m = glm::rotate(m, glm::radians(rot.z), glm::vec3(0.0f, 0.0f, 1.0f));
+                            m = glm::rotate(m, glm::radians(rot.y), glm::vec3(0.0f, 1.0f, 0.0f));
+                            m = glm::rotate(m, glm::radians(rot.x), glm::vec3(1.0f, 0.0f, 0.0f));
+                            return glm::translate(m, -pivote);
+                        };
+                    auto Pintar = [&](Model& pieza, const glm::mat4& m)
+                        {
+                            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(m));
+                            pieza.Draw(lightingShader);
+                        };
+                    const glm::vec3 CERO(0.0f);
 
-                    glm::mat4 modelPiernaSupIzq = glm::translate(modelCaderas, glm::vec3(-0.35f, -0.04f, 0.0f));
-                    modelPiernaSupIzq = glm::rotate(modelPiernaSupIzq, glm::radians(oscPiernas), glm::vec3(1.0f, 0.0f, 0.0f));
-                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPiernaSupIzq));
-                    PiernaSupIzqModel.Draw(lightingShader);
+                    // 2. CADERAS (nodo padre de todo el esqueleto)
+                    glm::mat4 mCadera = Articular(raiz, PIV_CADERA, glm::vec3(rotCadera, 0.0f, 0.0f));
+                    Pintar(CaderasModel, mCadera);
 
-                    glm::mat4 modelPiernaInfIzq = glm::translate(modelPiernaSupIzq, glm::vec3(0.0f, -0.04f, 0.0f));
-                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPiernaInfIzq));
-                    PiernaInfIzqModel.Draw(lightingShader);
+                    // 3. PIERNA IZQUIERDA: Cadera -> Muslo -> Pantorrilla -> Pie
+                    glm::mat4 mMusloIzq = Articular(mCadera, PIV_MUSLO_IZQ, glm::vec3(oscPiernas, 0.0f, 0.0f));
+                    Pintar(PiernaSupIzqModel, mMusloIzq);
+                    glm::mat4 mPantIzq = Articular(mMusloIzq, PIV_RODILLA_IZQ, glm::vec3(0.0f, 0.0f, 0.0f));
+                    Pintar(PiernaInfIzqModel, mPantIzq);
+                    glm::mat4 mPieIzq = Articular(mPantIzq, PIV_TOBILLO_IZQ, CERO);
+                    Pintar(PieIzqModel, mPieIzq);
+                    glm::mat4 mSkiIzq = Articular(mPieIzq, PIV_SKI_IZQ, glm::vec3(rotRodillas, 0.0f, 0.0f));
+                    Pintar(SkiIzqModel, mPieIzq);
 
-                    glm::mat4 modelPieIzq = glm::translate(modelPiernaInfIzq, glm::vec3(0.0f, -0.04f, 0.0f));
-                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPieIzq));
-                    PieIzqModel.Draw(lightingShader);
+                    // 4. PIERNA DERECHA (fase opuesta)
+                    glm::mat4 mMusloDer = Articular(mCadera, PIV_MUSLO_DER, glm::vec3(-oscPiernas, 0.0f, 0.0f));
+                    Pintar(PiernaSupDerModel, mMusloDer);
+                    glm::mat4 mPantDer = Articular(mMusloDer, PIV_RODILLA_DER, glm::vec3(0.0f, 0.0f, 0.0f));
+                    Pintar(PiernaInfDerModel, mPantDer);
+                    glm::mat4 mPieDer = Articular(mPantDer, PIV_TOBILLO_DER, CERO);
+                    Pintar(PieDerModel, mPieDer);
+                    glm::mat4 mSkiDer = Articular(mPieDer, PIV_SKI_DER, glm::vec3(rotRodillas, 0.0f, 0.0f));
+                    Pintar(SkiDerModel, mSkiDer);
 
-                    glm::mat4 modelPiernaSupDer = glm::translate(modelCaderas, glm::vec3(0.35f, -0.04f, 0.0f));
-                    modelPiernaSupDer = glm::rotate(modelPiernaSupDer, glm::radians(-oscPiernas), glm::vec3(1.0f, 0.0f, 0.0f));
-                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPiernaSupDer));
-                    PiernaSupDerModel.Draw(lightingShader);
+                    // 5. TREN SUPERIOR: Cadera -> Cintura -> Pecho -> Cuello -> Cabeza
+                    glm::mat4 mCintura = Articular(mCadera, PIV_CINTURA, glm::vec3(incTorso, 0.0f, 0.0f));
+                    Pintar(CinturaModel, mCintura);
+                    glm::mat4 mPecho = Articular(mCintura, PIV_PECHO, glm::vec3(rotTorso, 0.0f, 0.0f)); // rotTorso (tecla Z) = prueba de pivote
+                    Pintar(PechoModel, mPecho);
+                    glm::mat4 mCuello = Articular(mPecho, PIV_CUELLO, CERO);
+                    Pintar(CuelloModel, mCuello);
+                    glm::mat4 mCabeza = Articular(mCuello, PIV_CABEZA, glm::vec3(rotCabeza, 0.0f, 0.0f));
+                    Pintar(CabezaModel, mCabeza);
 
-                    glm::mat4 modelPiernaInfDer = glm::translate(modelPiernaSupDer, glm::vec3(0.0f, -0.04f, 0.0f));
-                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPiernaInfDer));
-                    PiernaInfDerModel.Draw(lightingShader);
+                    // 6. BRAZO IZQUIERDO: Pecho -> Hombro -> Brazo -> Antebrazo -> Mano
+                    glm::mat4 mHombroIzq = Articular(mPecho, PIV_HOMBRO_IZQ, CERO);
+                    Pintar(HombroIzqModel, mHombroIzq);
+                    glm::mat4 mBrazoIzq = Articular(mHombroIzq, PIV_HOMBRO_IZQ, glm::vec3(-oscPiernas, 0.0f, 0.0f));
+                    Pintar(BrazoIzqModel, mBrazoIzq);
+                    glm::mat4 mAntebIzq = Articular(mBrazoIzq, PIV_CODO_IZQ, glm::vec3(rotCodos, 0.0f, 0.0f));
+                    Pintar(AntebrazoIzqModel, mAntebIzq);
+                    glm::mat4 mManoIzq = Articular(mAntebIzq, PIV_MUNECA_IZQ, CERO);
+                    Pintar(ManoIzqModel, mManoIzq);
 
-                    glm::mat4 modelPieDer = glm::translate(modelPiernaInfDer, glm::vec3(0.0f, -0.04f, 0.0f));
-                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPieDer));
-                    PieDerModel.Draw(lightingShader);
+                    // 7. BRAZO DERECHO
+                    glm::mat4 mHombroDer = Articular(mPecho, PIV_HOMBRO_DER, CERO);
+                    Pintar(HombroDerModel, mHombroDer);
+                    glm::mat4 mBrazoDer = Articular(mHombroDer, PIV_HOMBRO_DER, glm::vec3(oscPiernas, 0.0f, 0.0f));
+                    Pintar(BrazoDerModel, mBrazoDer);
+                    glm::mat4 mAntebDer = Articular(mBrazoDer, PIV_CODO_DER, CERO);
+                    Pintar(AntebrazoDerModel, mAntebDer);
+                    glm::mat4 mManoDer = Articular(mAntebDer, PIV_MUNECA_DER, CERO);
+                    Pintar(ManoDerModel, mManoDer);
 
-                    // --- TREN SUPERIOR ---
-                    glm::mat4 modelCintura = modelCaderas;
-                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelCintura));
-                    CinturaModel.Draw(lightingShader);
 
-                    glm::mat4 modelPecho = glm::translate(modelCintura, glm::vec3(0.0f, 0.04f, 0.0f));
-                    modelPecho = glm::rotate(modelPecho, glm::radians(incTorso), glm::vec3(1.0f, 0.0f, 0.0f));
-                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPecho));
-                    PechoModel.Draw(lightingShader);
-
-                    glm::mat4 modelCuello = glm::translate(modelPecho, glm::vec3(0.0f, 0.04f, 0.0f));
-                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelCuello));
-                    CuelloModel.Draw(lightingShader);
-
-                    glm::mat4 modelCabeza = glm::translate(modelCuello, glm::vec3(0.0f, 0.1f, 0.0f));
-                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelCabeza));
-                    CabezaModel.Draw(lightingShader);
-
-                    // --- BRAZOS Y MANOS ---
-                    glm::mat4 modelHombroIzq = glm::translate(modelPecho, glm::vec3(-0.08f, -0.1f, 0.0f));
-                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelHombroIzq));
-                    HombroIzqModel.Draw(lightingShader);
-
-                    glm::mat4 modelBrazoIzq = modelHombroIzq;
-                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelBrazoIzq));
-                    BrazoIzqModel.Draw(lightingShader);
-
-                    glm::mat4 modelAntebrazoIzq = glm::translate(modelBrazoIzq, glm::vec3(0.0f, -0.009f, 0.0f));
-                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelAntebrazoIzq));
-                    AntebrazoIzqModel.Draw(lightingShader);
-
-                    glm::mat4 modelManoIzq = glm::translate(modelAntebrazoIzq, glm::vec3(0.0f, 0.01f, 0.0f));
-                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelManoIzq));
-                    ManoIzqModel.Draw(lightingShader);
-
-                    glm::mat4 modelHombroDer = glm::translate(modelPecho, glm::vec3(0.08f, -0.1f, 0.0f));
-                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelHombroDer));
-                    HombroDerModel.Draw(lightingShader);
-
-                    glm::mat4 modelBrazoDer = modelHombroDer;
-                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelBrazoDer));
-                    BrazoDerModel.Draw(lightingShader);
-
-                    glm::mat4 modelAntebrazoDer = glm::translate(modelBrazoDer, glm::vec3(0.0f, -0.009f, 0.0f));
-                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelAntebrazoDer));
-                    AntebrazoDerModel.Draw(lightingShader);
-
-                    glm::mat4 modelManoDer = glm::translate(modelAntebrazoDer, glm::vec3(0.0f, 0.01f, 0.0f));
-                    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelManoDer));
-                    ManoDerModel.Draw(lightingShader);
                 };
 
             // 1. Dibujar al Jugador
@@ -3096,6 +3123,27 @@ void DoMovement()
  */
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode)
 {
+    if (key == GLFW_KEY_Z)
+    {
+        rotTorso += 1.0f;
+    }
+    if (key == GLFW_KEY_X)
+    {
+        rotCabeza += 1.0f;
+    }
+    if (key == GLFW_KEY_C)
+    {
+        rotCadera += 1.0f;
+    }
+    if (key == GLFW_KEY_V)
+    {
+        rotRodillas += 1.0f;
+    }
+    if (key == GLFW_KEY_B)
+    {
+        rotCodos += 1.0f;
+    }
+
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
 
