@@ -251,11 +251,18 @@ enum EscenaActual
 
 EscenaActual escenaActual = ESCENA_HUB;
 
+//xcc- camara inicial frente al Hub
+Camera camera(glm::vec3(0.0f, 3.0f, 30.0f));
+
 // Posición base de cada pedestal de trofeos (calibrar con la tecla P dentro de la sala)
 std::vector<glm::vec3> posicionesTrofeos = {
     glm::vec3(-9.0f, 0.0f, -6.0f), glm::vec3(-3.0f, 0.0f, -6.0f),
     glm::vec3(3.0f, 0.0f, -6.0f), glm::vec3(9.0f, 0.0f, -6.0f)
 };
+
+//xcc- guarda cuales trofeos se han desbloqueado
+bool trofeosDesbloqueados[4] = { false, false, false, false};
+
 float factorInteriorHub = 0.0f;   // 0 = afuera del Hub, 1 = adentro (suavizado)
 
 
@@ -263,8 +270,9 @@ float factorInteriorHub = 0.0f;   // 0 = afuera del Hub, 1 = adentro (suavizado)
 int modoCamara = 0;                                   // 0 = inspección, 1 = tercera persona
 //Camera camera(glm::vec3(-255.0f, 52.0f, 36.0f));  
 
-//xcc- camara inicial frente al Hub
-Camera camera(glm::vec3(0.0f, 3.0f, 30.0f));
+
+
+
 
 GLfloat lastX = WIDTH / 2.0f;
 GLfloat lastY = HEIGHT / 2.0f;
@@ -537,6 +545,14 @@ bool CercaSalidaPista()
     return posicionCamara.z < -7.0f && posicionCamara.x > -7.0f && posicionCamara.x < 7.0f;
 }
 
+//xcc- verifica si la camara esta cerca de la entrada a trofeos
+bool CercaEntradaTrofeos()
+{
+    glm::vec3 posicionCamara = camera.GetPosition();
+
+    return posicionCamara.x > 13.0f && posicionCamara.x < 29.0f && posicionCamara.z > -3.0f && posicionCamara.z < 5.0f;
+}
+
 //xcc- verifica colisiones con los muebles del Hub
 bool ColisionMueblesHub(glm::vec3 posicion)
 {
@@ -685,6 +701,245 @@ bool ColisionMueblesHub(glm::vec3 posicion)
         return true;
     }
 
+
+    return false;
+}
+
+//xcc- verifica los limites del exterior del Hub
+bool ColisionExteriorHub(glm::vec3 posicion)
+{
+    float linea;
+
+    //xcc- limite derecho
+    if (posicion.z > 21.0f && posicion.z < 40.6f)
+    {
+        linea = -0.0171f * posicion.z + 46.013f;
+        if (posicion.x > linea - 1.0f && posicion.x < linea + 1.0f)
+            return true;
+    }
+
+    //xcc- limite superior derecho
+    if (posicion.x > 24.27f && posicion.x < 45.57f)
+    {
+        linea = -0.0148f * posicion.x + 41.475f;
+        if (posicion.z > linea - 1.0f && posicion.z < linea + 1.0f)
+            return true;
+    }
+
+    //xcc- limite diagonal derecho
+    if (posicion.x > 12.58f && posicion.x < 24.26f)
+    {
+        linea = -2.2274f * posicion.x + 95.734f;
+        if (posicion.z > linea - 1.0f && posicion.z < linea + 1.0f)
+            return true;
+    }
+
+    //xcc- limite superior
+    if (posicion.x > -9.78f && posicion.x < 12.43f)
+    {
+        linea = 0.0138f * posicion.x + 68.184f;
+        if (posicion.z > linea - 1.0f && posicion.z < linea + 1.0f)
+            return true;
+    }
+
+    //xcc- limite diagonal izquierdo
+    if (posicion.x > -21.57f && posicion.x < -10.53f)
+    {
+        linea = 2.4600f * posicion.x + 93.940f;
+        if (posicion.z > linea - 1.0f && posicion.z < linea + 1.0f)
+            return true;
+    }
+
+    //xcc- limite superior izquierdo
+    if (posicion.x > -41.38f && posicion.x < -22.16f)
+    {
+        linea = 0.0068f * posicion.x + 40.814f;
+        if (posicion.z > linea - 1.0f && posicion.z < linea + 1.0f)
+            return true;
+    }
+
+    //xcc- limite izquierdo
+    if (posicion.z > 21.02f && posicion.z < 38.86f)
+    {
+        linea = 0.1248f * posicion.z - 46.219f;
+        if (posicion.x > linea - 1.0f && posicion.x < linea + 1.0f)
+            return true;
+    }
+
+    //xcc- colision con la cerca superior
+    if (posicion.x > -16.94f && posicion.x < 17.23f)
+    {
+        linea = 0.0630f * posicion.x + 69.144f;
+
+        if (posicion.z > linea - 1.0f && posicion.z < linea + 1.0f)
+            return true;
+    }
+
+    //xcc- colision con roca o arbol exterior 1
+    if (posicion.x > -6.7f && posicion.x < -3.7f &&
+        posicion.z > 50.1f && posicion.z < 53.1f) return true;
+
+    //xcc- colision con roca o arbol exterior 2
+    if (posicion.x > 8.2f && posicion.x < 11.2f &&
+        posicion.z > 40.3f && posicion.z < 43.3f) return true;
+
+    //xcc- colision con roca o arbol exterior 3
+    if (posicion.x > 11.7f && posicion.x < 14.7f &&
+        posicion.z > 37.5f && posicion.z < 40.5f) return true;
+
+    //xcc- colision con roca o arbol exterior 4
+    if (posicion.x > 13.1f && posicion.x < 16.1f &&
+        posicion.z > 40.3f && posicion.z < 43.3f) return true;
+
+    //xcc- colision con roca o arbol exterior 5
+    if (posicion.x > 18.0f && posicion.x < 21.0f &&
+        posicion.z > 39.6f && posicion.z < 42.6f) return true;
+
+    //xcc- colision con roca o arbol exterior 6
+    if (posicion.x > 22.7f && posicion.x < 25.7f &&
+        posicion.z > 35.9f && posicion.z < 38.9f) return true;
+
+    //xcc- colision con roca o arbol exterior 7
+    if (posicion.x > 28.1f && posicion.x < 31.1f &&
+        posicion.z > 33.3f && posicion.z < 36.3f) return true;
+
+    //xcc- colision con roca o arbol exterior 8
+    if (posicion.x > 32.4f && posicion.x < 35.4f &&
+        posicion.z > 28.7f && posicion.z < 31.7f) return true;
+
+    //xcc- colision con roca o arbol exterior 9
+    if (posicion.x > 17.9f && posicion.x < 20.9f &&
+        posicion.z > 38.8f && posicion.z < 41.8f) return true;
+
+    //xcc- colision con roca o arbol exterior 10
+    if (posicion.x > 6.9f && posicion.x < 9.9f &&
+        posicion.z > 39.3f && posicion.z < 42.3f) return true;
+
+    //xcc- colision con roca o arbol exterior 11
+    if (posicion.x > 5.3f && posicion.x < 8.3f &&
+        posicion.z > 36.5f && posicion.z < 39.5f) return true;
+
+    //xcc- colision con roca o arbol exterior 12
+    if (posicion.x > -8.2f && posicion.x < -5.2f &&
+        posicion.z > 39.5f && posicion.z < 42.5f) return true;
+
+    //xcc- colision con roca o arbol exterior 13
+    if (posicion.x > -13.2f && posicion.x < -10.2f &&
+        posicion.z > 39.0f && posicion.z < 42.0f) return true;
+
+    //xcc- colision con roca o arbol exterior 14
+    if (posicion.x > -14.4f && posicion.x < -11.4f &&
+        posicion.z > 32.7f && posicion.z < 35.7f) return true;
+
+    //xcc- colision con roca o arbol exterior 15
+    if (posicion.x > -22.7f && posicion.x < -19.7f &&
+        posicion.z > 32.9f && posicion.z < 35.9f) return true;
+
+    //xcc- colision con roca o arbol exterior 16
+    if (posicion.x > -31.6f && posicion.x < -28.6f &&
+        posicion.z > 29.7f && posicion.z < 32.7f) return true;
+
+    return false;
+}
+
+//xcc- verifica colisiones dentro de la sala de trofeos
+bool ColisionMueblesTrofeos(glm::vec3 posicion)
+{
+
+    //xcc- colision con banca central
+    if (posicion.x > -0.7f && posicion.x < 0.9f &&
+        posicion.z > 3.0f && posicion.z < 3.9f)
+    {
+        return true;
+    }
+
+    //xcc- colision con banca derecha
+    if (posicion.x > 3.6f && posicion.x < 5.4f &&
+        posicion.z > 2.2f && posicion.z < 3.1f)
+    {
+        return true;
+    }
+
+    //xcc- colision con banca izquierda
+    if (posicion.x > -5.7f && posicion.x < -3.8f &&
+        posicion.z > 2.4f && posicion.z < 3.5f)
+    {
+        return true;
+    }
+
+    //xcc- colision con el podio
+    if (posicion.x > -2.65f && posicion.x < 2.77f &&
+        posicion.z > 0.37f && posicion.z < 1.39f)
+    {
+        return true;
+    }
+
+    //xcc- colision con las vitrinas
+    if (posicion.x > -5.59f && posicion.x < 5.70f &&
+        posicion.z > -3.60f && posicion.z < -1.95f)
+    {
+        return true;
+    }
+
+
+    //xcc- colision con planta izquierda
+    if (posicion.x > -4.1f && posicion.x < -3.2f &&
+        posicion.z > -0.55f && posicion.z < 0.35f)
+    {
+        return true;
+    }
+
+    //xcc- colision con planta derecha
+    if (posicion.x > 3.3f && posicion.x < 4.2f &&
+        posicion.z > -0.65f && posicion.z < 0.25f)
+    {
+        return true;
+    }
+
+    //xcc- colision con repisa de la parte nueva
+    if (posicion.x > 3.75f && posicion.x < 5.62f &&
+        posicion.z > 11.20f && posicion.z < 11.68f)
+    {
+        return true;
+    }
+
+    //xcc- colision con silla o mesa nueva 1
+    if (posicion.x > -5.62f && posicion.x < -4.57f &&
+        posicion.z > 9.61f && posicion.z < 10.61f) return true;
+
+    //xcc- colision con silla o mesa nueva 2
+    if (posicion.x > -4.70f && posicion.x < -3.35f &&
+        posicion.z > 8.82f && posicion.z < 9.39f) return true;
+
+    //xcc- colision con silla o mesa nueva 3
+    if (posicion.x > -3.40f && posicion.x < -2.09f &&
+        posicion.z > 9.85f && posicion.z < 10.77f) return true;
+
+    //xcc- colision con silla o mesa nueva 4
+    if (posicion.x > 4.97f && posicion.x < 5.70f &&
+        posicion.z > 4.86f && posicion.z < 6.11f) return true;
+
+    //xcc- colision con planta nueva izquierda
+    if (posicion.x > -5.7f && posicion.x < -4.8f &&
+        posicion.z > 10.7f && posicion.z < 11.65f)
+    {
+        return true;
+    }
+
+    //xcc- colision con planta nueva derecha
+    if (posicion.x > 2.6f && posicion.x < 3.5f &&
+        posicion.z > 10.8f && posicion.z < 11.65f)
+    {
+        return true;
+    }
+
+    //xcc- colision con mesa nueva derecha
+    if (posicion.x > 5.05f && posicion.x < 5.70f &&
+        posicion.z > 4.85f && posicion.z < 6.21f)
+    {
+        return true;
+    }
+
     return false;
 }
 
@@ -704,6 +959,11 @@ bool CercaPanelConfiguracion();
 bool CercaSalidaPista();
 //xcc- verifica colisiones con los muebles del Hub
 bool ColisionMueblesHub(glm::vec3 posicion);
+//xcc- colisiones de los muebles de trofeos
+bool ColisionMueblesTrofeos(glm::vec3 posicion);
+//xcc- verifica si esta cerca de la entrada a trofeos
+bool CercaEntradaTrofeos();
+
 
 /**
  * @brief Carga una textura 2D con SOIL2 (el mismo cargador que usa Model.h),
@@ -763,6 +1023,9 @@ void  DibujarHUD(Shader& hudShader);
 //xcc- HUD para las opciones del Hub
 void DibujarHUDHub(Shader& hudShader);
 
+//xcc- aviso para regresar al Hub
+void DibujarAvisoVolverHub(Shader& hudShader);
+
 // ============================================================================
 //  ETAPA 6. PROGRAMA PRINCIPAL
 // ============================================================================
@@ -806,8 +1069,10 @@ int main()
 
     glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+
+
+
 
     // ------------------------------------------------------------------------
     //  6.3 Carga de shaders
@@ -857,6 +1122,12 @@ int main()
     // ------------------------------------------------------------------------
     Model PistaCompleta((char*)"Models/Entorno/pista.obj");
     Model HubCentral((char*)"Models/Hub/Hub_central.obj"); //xcc
+    //xcc- carga los elementos exteriores del Hub
+    Model HubExterior((char*)"Models/Hub/Exterior.obj");
+    //xcc- carga la sala de trofeos
+    Model SalaTrofeos((char*)"Models/Trofeos/Sala_Trofeos.obj");
+    //xcc- carga la parte nueva de la sala de trofeos
+    Model SalaTrofeosNueva((char*)"Models/Trofeos/Sala_Trofeos_parte_nueva.obj");
 
     // Cargar las opciones de trajes para el sistema de personalización
     GLuint texTrajeTurquesa = CargarTextura("images/traje_turquesa.png");
@@ -1049,11 +1320,65 @@ int main()
         if (escenaActual == ESCENA_HUB)
         {
             HubCentral.Draw(lightingShader);
+
+            //xcc- dibuja el exterior del Hub
+            HubExterior.Draw(lightingShader);
         }
-        else if (escenaActual == ESCENA_PISTA)
+        else if (escenaActual == ESCENA_PISTA)//xcc
         {
             PistaCompleta.Draw(lightingShader);
-        }//xcc prueba 
+        }
+        else if (escenaActual == ESCENA_TROFEOS)
+        {
+            //xcc- aumenta la luz ambiental dentro de trofeos
+            glUniform3f(
+                glGetUniformLocation(lightingShader.Program, "dirLight.ambient"),
+                0.42f, 0.38f, 0.32f
+            );
+
+            //xcc- ilumina un poco mas los materiales
+            glUniform3f(
+                glGetUniformLocation(lightingShader.Program, "dirLight.diffuse"),
+                0.75f, 0.70f, 0.65f
+            );
+
+
+            //xcc- usa dos luces puntuales dentro de trofeos
+            glUniform1i(glGetUniformLocation(lightingShader.Program, "numPointLights"), 2);
+
+            //xcc- luz izquierda
+            glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].position"), -3.0f, 3.5f, 0.0f);
+            glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].ambient"), 0.15f, 0.12f, 0.08f);
+            glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].diffuse"), 0.85f, 0.65f, 0.45f);
+            glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].specular"), 1.0f, 0.85f, 0.65f);
+            glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[0].constant"), 1.0f);
+            glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[0].linear"), 0.09f);
+            glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[0].quadratic"), 0.032f);
+
+            //xcc- luz derecha
+            glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[1].position"), 3.0f, 3.5f, 0.0f);
+            glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[1].ambient"), 0.15f, 0.12f, 0.08f);
+            glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[1].diffuse"), 0.85f, 0.65f, 0.45f);
+            glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[1].specular"), 1.0f, 0.85f, 0.65f);
+            glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[1].constant"), 1.0f);
+            glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[1].linear"), 0.09f);
+            glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[1].quadratic"), 0.032f);
+
+            //xcc- activa transparencia en la sala de trofeos
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glUniform1i(glGetUniformLocation(lightingShader.Program, "transparency"), 1);
+
+            //xcc- dibuja la sala de trofeos
+            SalaTrofeos.Draw(lightingShader);
+
+            //xcc- dibuja la parte nueva de la sala
+            SalaTrofeosNueva.Draw(lightingShader);
+
+            //xcc- desactiva transparencia para los demas objetos
+            glUniform1i(glGetUniformLocation(lightingShader.Program, "transparency"), 0);
+            glDisable(GL_BLEND);
+        }
 
 
 // ---- 6.7.7 Elementos de color plano: postes, colisionadores y esquiador ----
@@ -1304,7 +1629,7 @@ int main()
 
 
         //xcc- terreno amplio alrededor del Hub
-        if (escenaActual == ESCENA_HUB)
+        if (escenaActual == ESCENA_HUB || escenaActual == ESCENA_TROFEOS)
         {
             colorShader.Use();
             glUniformMatrix4fv(glGetUniformLocation(colorShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
@@ -1366,6 +1691,15 @@ int main()
         else if (escenaActual == ESCENA_PISTA)
         {
             DibujarHUD(hudShader);
+
+            //xcc- muestra el regreso al Hub antes de iniciar o al terminar
+            if (estadoCarrera == 0 || estadoCarrera == 2)
+                DibujarAvisoVolverHub(hudShader);
+        }
+        else if (escenaActual == ESCENA_TROFEOS)
+        {
+            //xcc- muestra como regresar al Hub
+            DibujarAvisoVolverHub(hudShader);
         }
 
         // ---- 6.7.10 Intercambio de buffers ----
@@ -2128,6 +2462,16 @@ void ActualizarCarrera(Model& terreno)
         tiempoFinalCarrera = tiempoActualCarrera;
         tiempoMensajeMeta = ahora;
         velActual = 0.0f;
+        //xcc- desbloquea trofeos al terminar la carrera
+        trofeosDesbloqueados[0] = true;
+
+        if (nivelActual >= 1)
+            trofeosDesbloqueados[1] = true;
+
+        if (nivelActual >= 2)
+            trofeosDesbloqueados[2] = true;
+
+        //xcc- conserva la posicion final calculada en la carrera
         posicionJugadorActual = CalcularPosicionJugador();
 
         std::cout << "\n==========================================" << std::endl;
@@ -2386,8 +2730,32 @@ void DibujarHUDHub(Shader& hudShader)
         DibujarTexto(hudShader, "PRESIONA E PARA IR A PISTA", 0.0f, SCREEN_HEIGHT - 70.0f * e, 3.0f * e, glm::vec4(0.0, 0.0, 0.0, 1.0f), true);
     }
 
-    glEnable(GL_DEPTH_TEST);
+    //xcc- muestra aviso cerca de la entrada a trofeos
+    if (CercaEntradaTrofeos())
+    {
+        DibujarTexto(hudShader, "PRESIONA E PARA IR A TROFEOS",
+            0.0f, SCREEN_HEIGHT - 70.0f * e, 3.0f * e,
+            glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), true);
+    }
 
+    glEnable(GL_DEPTH_TEST);
+}
+
+//xcc- muestra el aviso para regresar al Hub
+void DibujarAvisoVolverHub(Shader& hudShader)
+{
+    glDisable(GL_DEPTH_TEST);
+    hudShader.Use();
+
+    glm::mat4 ortho = glm::ortho(0.0f, (float)SCREEN_WIDTH, 0.0f, (float)SCREEN_HEIGHT);
+    glUniformMatrix4fv(glGetUniformLocation(hudShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(ortho));
+
+    float e = SCREEN_HEIGHT / 800.0f;
+
+    DibujarTexto(hudShader, "PRESIONA H PARA VOLVER AL HUB", 0.0f, 35.0f * e, 2.5f * e,
+        glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), true);
+
+    glEnable(GL_DEPTH_TEST);
 }
 
 void DibujarHUD(Shader& hudShader)
@@ -2527,10 +2895,10 @@ void DoMovement()
             posicionCamara.y = 5.0f;
 
             //xcc- limita las paredes cuando la camara entra al Hub
-            if (posicionCamara.z < 20.0f) // no te limita mientras te acercas a la puerta; los límites empiezan cuando ya estás entrando.
+            if (posicionCamara.z < 20.0f)
             {
                 posicionCamara.x = glm::clamp(posicionCamara.x, -21.0f, 21.0f);
-                posicionCamara.z = glm::max(posicionCamara.z, -16.0f); //pone limites a donde llega la camara dentro del hub
+                posicionCamara.z = glm::max(posicionCamara.z, -16.0f);
             }
 
             //xcc- bloquea la pared frontal dejando libre la puerta
@@ -2539,27 +2907,51 @@ void DoMovement()
                 if (posicionCamara.x < -3.3f || posicionCamara.x > 3.3f)
                 {
                     posicionCamara = posicionAnterior;
-                    posicionCamara.y = 3.0f;
+                    posicionCamara.y = 5.0f;
                 }
             }
 
-            //xcc- corrige atravesar cada mueve por cada eje
-            glm::vec3 pruebaX(posicionCamara.x, 3.0f, posicionAnterior.z);
+            //xcc- corrige las colisiones del Hub por cada eje
+            glm::vec3 pruebaX(posicionCamara.x, 5.0f, posicionAnterior.z);
 
-            if (ColisionMueblesHub(pruebaX))
-            {
+            if (ColisionMueblesHub(pruebaX) || ColisionExteriorHub(pruebaX))
                 posicionCamara.x = posicionAnterior.x;
-            }
 
-            glm::vec3 pruebaZ(posicionCamara.x, 3.0f, posicionCamara.z);
+            glm::vec3 pruebaZ(posicionCamara.x, 5.0f, posicionCamara.z);
 
-            if (ColisionMueblesHub(pruebaZ))
-            {
+            if (ColisionMueblesHub(pruebaZ) || ColisionExteriorHub(pruebaZ))
                 posicionCamara.z = posicionAnterior.z;
-            }
 
             camera.SetPosition(posicionCamara);
         }
+
+        //xcc- limita el movimiento dentro de la sala de trofeos
+        if (escenaActual == ESCENA_TROFEOS)
+        {
+            glm::vec3 posicionCamara = camera.GetPosition();
+
+            //xcc- mantiene la altura de la camara
+            posicionCamara.y = 1.7f;
+
+            //xcc- limita las paredes laterales de trofeos
+            posicionCamara.x = glm::clamp(posicionCamara.x, -5.7f, 5.7f);
+
+            //xcc- limita las paredes del fondo y de la parte nueva
+            posicionCamara.z = glm::clamp(posicionCamara.z, -3.6f, 11.65f);
+
+            //xcc- corrige las colisiones de trofeos por cada eje
+            glm::vec3 pruebaX(posicionCamara.x, 1.7f, posicionAnterior.z);
+            if (ColisionMueblesTrofeos(pruebaX))
+                posicionCamara.x = posicionAnterior.x;
+
+            glm::vec3 pruebaZ(posicionCamara.x, 1.7f, posicionCamara.z);
+            if (ColisionMueblesTrofeos(pruebaZ))
+                posicionCamara.z = posicionAnterior.z;
+
+            camera.SetPosition(posicionCamara);
+        }
+
+
     }
 
     // --- CÁLCULO DE ANIMACIONES DEL ESQUIADOR ---
@@ -2626,6 +3018,25 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         reiniciarContrincantes = true;
     }
 
+    //xcc- cambia del Hub a la sala de trofeos
+    if (key == GLFW_KEY_E && action == GLFW_PRESS && escenaActual == ESCENA_HUB && CercaEntradaTrofeos())
+    {
+        escenaActual = ESCENA_TROFEOS;
+        modoCamara = 0;
+        camera.SetPosition(glm::vec3(0.0f, 3.0f, 10.0f));
+
+        std::cout << "Cambio de escena: Hub -> Trofeos" << std::endl;
+    }
+
+    //xcc- regresa al Hub desde pista o trofeos
+    if (key == GLFW_KEY_H && action == GLFW_PRESS &&
+        (escenaActual == ESCENA_PISTA || escenaActual == ESCENA_TROFEOS))
+    {
+        escenaActual = ESCENA_HUB;
+        modoCamara = 0;
+        camera.SetPosition(glm::vec3(0.0f, 3.0f, 30.0f));
+        std::cout << "Cambio de escena: regreso al Hub" << std::endl;
+    }
 
     // Cambio de cámara
     if (key == GLFW_KEY_C && action == GLFW_PRESS)

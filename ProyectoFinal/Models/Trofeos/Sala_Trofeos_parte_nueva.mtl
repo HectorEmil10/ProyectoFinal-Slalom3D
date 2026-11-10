@@ -1,0 +1,572 @@
+# Blender 5.1.2 MTL File: 'None'
+# www.blender.org
+
+newmtl Alfombra_Roja
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Alfombra_Roja.png
+
+newmtl Azul_Vitrina
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Azul_Vitrina.png
+
+newmtl Banco_Azul
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Banco_Azul.png
+
+newmtl Banner_Skier
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Banner_Skier.png
+
+newmtl Banner_Skis
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Banner_Skis.png
+
+newmtl Blanco
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Blanco.png
+
+newmtl Cuadro_Esquiador_Rojo
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Cuadro_Esquiador_Rojo.png
+
+newmtl Cuadro_Paisaje_Alpino
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Cuadro_Paisaje_Alpino.png
+
+newmtl Dorado_Detalle
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Dorado_Detalle.png
+
+newmtl Logro_Campeon
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Logro_Campeon.png
+
+newmtl Logro_Completo
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Logro_Completo.png
+
+newmtl Logro_Explorador
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Logro_Explorador.png
+
+newmtl Logro_Maestro
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Logro_Maestro.png
+
+newmtl Logro_Perfecto
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Logro_Perfecto.png
+
+newmtl Logro_Primera
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Logro_Primera.png
+
+newmtl Logro_Record
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Logro_Record.png
+
+newmtl Logro_Tormenta
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Logro_Tormenta.png
+
+newmtl Logro_Velocidad
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Logro_Velocidad.png
+
+newmtl Luz_Calida
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Luz_Calida.png
+
+newmtl Macetero_Madera
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Macetero_Madera.png
+
+newmtl Madera_Clara
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Madera_Clara.png
+
+newmtl Madera_Oscura
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Madera_Oscura.png
+
+newmtl Madera_Pared
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Madera_Pared.png
+
+newmtl Marco_Blanco
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Marco_Blanco.png
+
+newmtl Metal_Estante
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Metal_Estante.png
+
+newmtl Negro
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Negro.png
+
+newmtl Pared_Azul
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Pared_Azul.png
+
+newmtl Piso_Gris
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Piso_Gris.png
+
+newmtl Planta_Hoja
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Planta_Hoja.png
+
+newmtl Podio_1_Frente
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Podio_1_Frente.png
+
+newmtl Podio_2_Frente
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Podio_2_Frente.png
+
+newmtl Podio_3_Frente
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Podio_3_Frente.png
+
+newmtl Podio_Liso
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Podio_Liso.png
+
+newmtl Rotulo_SalaTrofeos
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Rotulo_SalaTrofeos.png
+
+newmtl Techo_Claro
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Techo_Claro.png
+
+newmtl TrofeoModelo_Azul_0
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd Texturas/TrofeoModelo_Azul_0.png
+map_d Texturas/TrofeoModelo_Azul_0.png
+
+newmtl TrofeoModelo_Azul_1
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd Texturas/TrofeoModelo_Azul_1.png
+map_d Texturas/TrofeoModelo_Azul_1.png
+
+newmtl TrofeoModelo_Bronce_0
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd Texturas/TrofeoModelo_Bronce_0.png
+map_d Texturas/TrofeoModelo_Bronce_0.png
+
+newmtl TrofeoModelo_Bronce_1
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd Texturas/TrofeoModelo_Bronce_1.png
+map_d Texturas/TrofeoModelo_Bronce_1.png
+
+newmtl TrofeoModelo_Cristal_0
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd Texturas/TrofeoModelo_Cristal_0.png
+map_d Texturas/TrofeoModelo_Cristal_0.png
+
+newmtl TrofeoModelo_Cristal_1
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd Texturas/TrofeoModelo_Cristal_1.png
+map_d Texturas/TrofeoModelo_Cristal_1.png
+
+newmtl TrofeoModelo_Oro_0
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd Texturas/TrofeoModelo_Oro_0.png
+map_d Texturas/TrofeoModelo_Oro_0.png
+
+newmtl TrofeoModelo_Oro_1
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd Texturas/TrofeoModelo_Oro_1.png
+map_d Texturas/TrofeoModelo_Oro_1.png
+
+newmtl TrofeoModelo_Plata_0
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd Texturas/TrofeoModelo_Plata_0.png
+map_d Texturas/TrofeoModelo_Plata_0.png
+
+newmtl TrofeoModelo_Plata_1
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd Texturas/TrofeoModelo_Plata_1.png
+map_d Texturas/TrofeoModelo_Plata_1.png
+
+newmtl TrofeoModelo_Rojo_0
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd Texturas/TrofeoModelo_Rojo_0.png
+map_d Texturas/TrofeoModelo_Rojo_0.png
+
+newmtl TrofeoModelo_Rojo_1
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd Texturas/TrofeoModelo_Rojo_1.png
+map_d Texturas/TrofeoModelo_Rojo_1.png
+
+newmtl TrofeoModelo_Verde_0
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd Texturas/TrofeoModelo_Verde_0.png
+map_d Texturas/TrofeoModelo_Verde_0.png
+
+newmtl TrofeoModelo_Verde_1
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd Texturas/TrofeoModelo_Verde_1.png
+map_d Texturas/TrofeoModelo_Verde_1.png
+
+newmtl VIDRIO_RGBA_OPENGL
+Ns 50.000011
+Ka 1.000000 1.000000 1.000000
+Ks 0.100000 0.100000 0.100000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Vidrio_RGBA_Transparente.png
+
+newmtl Verde_Pino
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Verde_Pino.png
+
+newmtl Vitrina_Fondo
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Vitrina_Fondo.png
+
+newmtl Alfombra_Montana
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Alfombra_Montana.png
+
+newmtl Alfombra_Puerta
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Alfombra_Puerta.png
+
+newmtl Cuadro_Teleferico
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Cuadro_Teleferico.png
+
+newmtl Puerta_Vista
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Puerta_Vista.png
+
+newmtl Tapizado_Crema
+Ns 15.000002
+Ka 1.000000 1.000000 1.000000
+Ks 0.070000 0.070000 0.070000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Tapizado_Crema.png

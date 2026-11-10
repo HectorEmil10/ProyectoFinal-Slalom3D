@@ -110,11 +110,19 @@ public:
 			vertex.Position = vector;
 
 			// Normals
-			vector.x = mesh->mNormals[i].x;
-			vector.y = mesh->mNormals[i].y;
-			vector.z = mesh->mNormals[i].z;
-			vertex.Normal = vector;
+			//xcc- verifica que el modelo tenga normales
+			if (mesh->HasNormals())
+			{
+				vector.x = mesh->mNormals[i].x;
+				vector.y = mesh->mNormals[i].y;
+				vector.z = mesh->mNormals[i].z;
+			}
+			else
+			{
+				vector = glm::vec3(0.0f, 1.0f, 0.0f);
+			}
 
+			vertex.Normal = vector;
 			// Texture Coordinates
 			if (mesh->mTextureCoords[0]) // Does the mesh contain texture coordinates?
 			{
@@ -238,7 +246,8 @@ GLint TextureFromFile(const char *path, string directory)
 	glBindTexture(GL_TEXTURE_2D, textureID);
 
 	int width, height;
-	unsigned char *image = SOIL_load_image(filename.c_str(), &width, &height, 0, SOIL_LOAD_RGB);
+	//xcc- carga tambien el canal alpha de las texturas
+	unsigned char* image = SOIL_load_image(filename.c_str(), &width, &height, 0, SOIL_LOAD_RGBA);
 
 	if (!image)
 	{
@@ -252,7 +261,8 @@ GLint TextureFromFile(const char *path, string directory)
 	}
 
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);   // Anchos no múltiplo de 4
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+	//xcc- guarda la textura con transparencia
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
 	glGenerateMipmap(GL_TEXTURE_2D);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 
