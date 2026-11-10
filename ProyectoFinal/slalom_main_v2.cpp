@@ -263,6 +263,10 @@ std::vector<glm::vec3> posicionesTrofeos = {
 //xcc- guarda cuales trofeos se han desbloqueado
 bool trofeosDesbloqueados[4] = { false, false, false, false};
 
+//xcc- controla las luces generales de la sala de trofeos
+bool lucesTrofeosCompletas = false;
+
+
 float factorInteriorHub = 0.0f;   // 0 = afuera del Hub, 1 = adentro (suavizado)
 
 
@@ -1293,7 +1297,8 @@ int main()
         if (escenaActual == ESCENA_HUB)
         {
             glm::vec3 p = camera.GetPosition();
-            bool dentroHub = (p.z < 19.0f && std::abs(p.x) < 21.0f);   // Mismos límites que DoMovement
+            //xcc- mantiene la iluminacion interior hasta las paredes del Hub
+            bool dentroHub = (p.z < 19.0f && std::abs(p.x) <= 21.0f); // Mismos límites que DoMovement
             factorInteriorHub = Suavizar(factorInteriorHub, dentroHub ? 1.0f : 0.0f, 4.0f, deltaTime);
             esquema = EsquemaHub(currentFrame, nivelActual, factorInteriorHub, esquema);
         }
@@ -1343,8 +1348,11 @@ int main()
             );
 
 
-            //xcc- usa dos luces puntuales dentro de trofeos
-            glUniform1i(glGetUniformLocation(lightingShader.Program, "numPointLights"), 2);
+            //xcc- usa 2 luces del podio o todas las luces de la sala
+            if (lucesTrofeosCompletas)
+                glUniform1i(glGetUniformLocation(lightingShader.Program, "numPointLights"), 6);
+            else
+                glUniform1i(glGetUniformLocation(lightingShader.Program, "numPointLights"), 2);
 
             //xcc- luz izquierda
             glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].position"), -3.0f, 3.5f, 0.0f);
@@ -1363,6 +1371,44 @@ int main()
             glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[1].constant"), 1.0f);
             glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[1].linear"), 0.09f);
             glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[1].quadratic"), 0.032f);
+
+            //xcc- luces generales que se encienden con L
+            if (lucesTrofeosCompletas)
+            {
+                //xcc- luces de la parte media
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[2].position"), -3.0f, 3.5f, 6.0f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[2].ambient"), 0.15f, 0.12f, 0.08f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[2].diffuse"), 0.85f, 0.65f, 0.45f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[2].specular"), 1.0f, 0.85f, 0.65f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[2].constant"), 1.0f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[2].linear"), 0.09f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[2].quadratic"), 0.032f);
+
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[3].position"), 3.0f, 3.5f, 6.0f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[3].ambient"), 0.15f, 0.12f, 0.08f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[3].diffuse"), 0.85f, 0.65f, 0.45f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[3].specular"), 1.0f, 0.85f, 0.65f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[3].constant"), 1.0f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[3].linear"), 0.09f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[3].quadratic"), 0.032f);
+
+                //xcc- luces de la parte nueva
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[4].position"), -3.0f, 3.5f, 10.0f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[4].ambient"), 0.15f, 0.12f, 0.08f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[4].diffuse"), 0.85f, 0.65f, 0.45f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[4].specular"), 1.0f, 0.85f, 0.65f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[4].constant"), 1.0f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[4].linear"), 0.09f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[4].quadratic"), 0.032f);
+
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[5].position"), 3.0f, 3.5f, 10.0f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[5].ambient"), 0.15f, 0.12f, 0.08f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[5].diffuse"), 0.85f, 0.65f, 0.45f);
+                glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[5].specular"), 1.0f, 0.85f, 0.65f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[5].constant"), 1.0f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[5].linear"), 0.09f);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[5].quadratic"), 0.032f);
+            }
 
             //xcc- activa transparencia en la sala de trofeos
             glEnable(GL_BLEND);
@@ -2696,6 +2742,11 @@ static void DibujarVentisca(Shader& hud)
 void DibujarHUDHub(Shader& hudShader)
 {
     glDisable(GL_DEPTH_TEST);
+
+    //xcc- activa transparencia para los textos del Hub
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     hudShader.Use();
 
     glm::mat4 ortho = glm::ortho(0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT, 0.0f);
@@ -2738,6 +2789,8 @@ void DibujarHUDHub(Shader& hudShader)
             glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), true);
     }
 
+    //xcc- termina las transparencias del HUD del Hub
+    glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
 }
 
@@ -2745,6 +2798,11 @@ void DibujarHUDHub(Shader& hudShader)
 void DibujarAvisoVolverHub(Shader& hudShader)
 {
     glDisable(GL_DEPTH_TEST);
+
+    //xcc- activa transparencia para los avisos
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     hudShader.Use();
 
     glm::mat4 ortho = glm::ortho(0.0f, (float)SCREEN_WIDTH, 0.0f, (float)SCREEN_HEIGHT);
@@ -2755,12 +2813,29 @@ void DibujarAvisoVolverHub(Shader& hudShader)
     DibujarTexto(hudShader, "PRESIONA H PARA VOLVER AL HUB", 0.0f, 35.0f * e, 2.5f * e,
         glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), true);
 
+    //xcc- muestra el control de las luces en trofeos
+    if (escenaActual == ESCENA_TROFEOS)
+    {
+        if (lucesTrofeosCompletas)
+            DibujarTexto(hudShader, "L - SOLO PODIO", 0.0f, 70.0f * e, 2.5f * e,
+                glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), true);
+        else
+            DibujarTexto(hudShader, "L - ENCENDER LUCES", 0.0f, 70.0f * e, 2.5f * e,
+                glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), true);
+    }
+
+    glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
 }
 
 void DibujarHUD(Shader& hudShader)
 {
     glDisable(GL_DEPTH_TEST);
+
+    //xcc- activa transparencias para HUD y ventisca
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     hudShader.Use();
 
     glm::mat4 ortho = glm::ortho(0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT, 0.0f);
@@ -2861,6 +2936,8 @@ void DibujarHUD(Shader& hudShader)
         DibujarTexto(hudShader, "T: VOLVER A LA SALIDA", 0.0f, SCREEN_HEIGHT * 0.68f, 3.0f * e, glm::vec4(0.9f, 0.9f, 0.9f, aMeta), true);
     }
 
+    //xcc- termina las transparencias del HUD
+    glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
 }
 
@@ -3025,6 +3102,9 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         modoCamara = 0;
         camera.SetPosition(glm::vec3(0.0f, 3.0f, 10.0f));
 
+        //xcc- al entrar solo quedan encendidas las luces del podio
+        lucesTrofeosCompletas = false;
+
         std::cout << "Cambio de escena: Hub -> Trofeos" << std::endl;
     }
 
@@ -3036,6 +3116,16 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         modoCamara = 0;
         camera.SetPosition(glm::vec3(0.0f, 3.0f, 30.0f));
         std::cout << "Cambio de escena: regreso al Hub" << std::endl;
+    }
+
+    //xcc- enciende o apaga las luces generales de trofeos
+    if (key == GLFW_KEY_L && action == GLFW_PRESS && escenaActual == ESCENA_TROFEOS)
+    {
+        lucesTrofeosCompletas = !lucesTrofeosCompletas;
+
+        std::cout << "Luces de trofeos: "
+            << (lucesTrofeosCompletas ? "encendidas" : "solo podio")
+            << std::endl;
     }
 
     // Cambio de cámara
