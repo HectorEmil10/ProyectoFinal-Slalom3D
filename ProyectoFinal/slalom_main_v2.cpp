@@ -145,6 +145,11 @@ const glm::vec3 PIV_TOBILLO_DER(-0.271096f, 0.076409f, 1.69405);
 const glm::vec3 PIV_SKI_IZQ(0.10514f, -0.042328f, 0.26877f);
 const glm::vec3 PIV_SKI_DER(-0.252572f, -0.039645f, 0.252299f);
 
+// ---- Parámetros de la pose ---- COPIAR A REPO
+const glm::vec3 PIV_SUELO(-0.093f, 0.0f, 0.0f);   // entre los esquís, a nivel del suelo (eje de inclinación lateral)
+const float LONG_MUSLO = PIV_MUSLO_IZQ.y - PIV_RODILLA_IZQ.y;   // ~0.908
+const float LONG_PANTORRILLA = PIV_RODILLA_IZQ.y - PIV_TOBILLO_IZQ.y;   // ~1.019
+
 // ---- Obstáculos (detección automática de árboles y rocas) ----
 const float MAX_ANCHO_OBSTACULO = 14.0f; // Objetos más anchos se ignoran (terreno, carteles)
 const float MIN_ANCHO_OBSTACULO = 0.3f;  // Objetos más angostos se ignoran
@@ -294,7 +299,7 @@ std::vector<glm::vec3> posicionesTrofeos = {
 };
 
 //xcc- guarda cuales trofeos se han desbloqueado
-bool trofeosDesbloqueados[4] = { false, false, false, false};
+bool trofeosDesbloqueados[4] = { false, false, false, false };
 
 //xcc- controla las luces generales de la sala de trofeos
 bool lucesTrofeosCompletas = false;
@@ -376,6 +381,9 @@ float tiempoAnim = 0.0f;
 float oscilacionPiernas = 0.0f;
 float inclinacionLateral = 0.0f;
 float inclinacionTorso = 0.0f;
+// -------------------------------------COPIAR A REPO
+float agachadoAnim = 0.2f;   // 0 = erguido, 1 = posición de huevo 
+float frenadaAnim = 0.0f;   // 0 = libre, 1 = frenando 
 
 // ---- Dificultad / clima ----
 int nivelActual = 0;
@@ -1481,9 +1489,9 @@ int main()
             glDisable(GL_BLEND);  // <---- ¡ESTA LÍNEA-- borrala----ROMPE LA VENTISCA!
         }
 
-// ---- 6.7.7 Elementos de color plano: postes, colisionadores y esquiador ----
+        // ---- 6.7.7 Elementos de color plano: postes, colisionadores y esquiador ----
 
-//xcc- elementos visibles solo en la pista
+        //xcc- elementos visibles solo en la pista
         if (escenaActual == ESCENA_PISTA)
         {
             colorShader.Use();
@@ -1595,7 +1603,7 @@ int main()
             glUniform2f(glGetUniformLocation(lightingShader.Program, "uvOffset"), 0.0f, 0.0f);
 
             // Lambda reutilizable para dibujar cualquier esquiador articulado (Jugador o Contrincantes)
-            auto DibujarEsquiador = [&](const glm::vec3& posEsq, float rotYEsq, float incLat, float incTorso, float oscPiernas, GLuint texTraje, const glm::vec3& tinteDifuso)
+            auto DibujarEsquiador = [&](const glm::vec3& posEsq, float rotYEsq, float incLat, float incTorso, float oscPiernas, float agachado, float frenada, GLuint texTraje, const glm::vec3& tinteDifuso)
                 {
                     glActiveTexture(GL_TEXTURE0);
                     glBindTexture(GL_TEXTURE_2D, texTraje);
@@ -1623,11 +1631,30 @@ int main()
                     ForzarTexturaEnModelo(AntebrazoDerModel, texTraje);
                     ForzarTexturaEnModelo(ManoDerModel, texTraje);
 
+                    // ===== POSE DEL ESQUIADOR =====
+                    const float giro = glm::clamp(incLat / ANGULO_GIRO_ESQUIADOR, -1.0f, 1.0f);  // -1 izq ... +1 der
+                    const float rebote = oscPiernas / 12.0f;                                       // -1..1 (amortiguación)
+                    const float crouch = glm::clamp(agachado + 0.05f * rebote, 0.0f, 1.0f);
+
+                    // Piernas paralelas: muslo adelante 'aMuslo', pantorrilla adelante 'sPant',
+                    // con el tobillo siempre bajo la cadera (los pies no se despegan ni se hunden)
+                    const float aMuslo = glm::radians(5.0f + 50.0f * crouch);
+                    const float sPant = std::asin(glm::clamp(LONG_MUSLO / LONG_PANTORRILLA * std::sin(aMuslo), -1.0f, 1.0f));
+                    const float bajada = LONG_MUSLO * (1.0f - std::cos(aMuslo)) + LONG_PANTORRILLA * (1.0f - std::cos(sPant));
+                    const float aDeg = glm::degrees(aMuslo);
+                    const float sDeg = glm::degrees(sPant);
+
+                    // Tronco, brazos y cabeza
+                    const float inclTronco = glm::mix(8.0f + 40.0f * crouch, -6.0f, frenada) + 0.5f * incTorso;
+                    const float brazoAdelante = glm::mix(10.0f + 30.0f * crouch, 5.0f, frenada);
+                    const float flexCodo = 15.0f + 55.0f * crouch * (1.0f - frenada);
+                    const float abd = 8.0f + 45.0f * frenada;   // apertura lateral de brazos al frenar
+
+
                     // 1. RAÍZ GLOBAL: origen de los .obj a nivel del suelo (los pies)
                     glm::mat4 raiz = glm::translate(glm::mat4(1.0f), posEsq - glm::vec3(0.0f, offsetPiesEsquiador, 0.0f));
                     raiz = glm::rotate(raiz, glm::radians(rotYEsq), glm::vec3(0.0f, 1.0f, 0.0f));
 
-                    // Articula: rota 'rot' (grados XYZ) alrededor de 'pivote' (absoluto) heredando al padre
                     auto Articular = [](const glm::mat4& padre, const glm::vec3& pivote, const glm::vec3& rot)
                         {
                             glm::mat4 m = glm::translate(padre, pivote);
@@ -1643,56 +1670,56 @@ int main()
                         };
                     const glm::vec3 CERO(0.0f);
 
-                    // 2. CADERAS (nodo padre de todo el esqueleto)
-                    glm::mat4 mCadera = Articular(raiz, PIV_CADERA, glm::vec3(rotCadera, 0.0f, 0.0f));
+                    // 2. Inclinación lateral (pivota en los esquís) + bajada de la cadera al agacharse
+                    glm::mat4 mBase = Articular(raiz, PIV_SUELO, glm::vec3(0.0f, 0.0f, incLat));
+                    mBase = glm::translate(mBase, glm::vec3(0.0f, -bajada, 0.0f));
+
+                    // 3. CADERAS (nodo padre del esqueleto)
+                    glm::mat4 mCadera = Articular(mBase, PIV_CADERA, glm::vec3(rotCadera, 0.0f, 0.0f));
                     Pintar(CaderasModel, mCadera);
 
-                    // 3. PIERNA IZQUIERDA: Cadera -> Muslo -> Pantorrilla -> Pie
-                    glm::mat4 mMusloIzq = Articular(mCadera, PIV_MUSLO_IZQ, glm::vec3(oscPiernas, 0.0f, 0.0f));
+                    // 4. PIERNA IZQUIERDA (el pie se contragira para quedar plano; cuña al frenar)
+                    glm::mat4 mMusloIzq = Articular(mCadera, PIV_MUSLO_IZQ, glm::vec3(-aDeg, 0.0f, 0.0f));
                     Pintar(PiernaSupIzqModel, mMusloIzq);
-                    glm::mat4 mPantIzq = Articular(mMusloIzq, PIV_RODILLA_IZQ, glm::vec3(0.0f, 0.0f, 0.0f));
+                    glm::mat4 mPantIzq = Articular(mMusloIzq, PIV_RODILLA_IZQ, glm::vec3(aDeg + sDeg + rotRodillas, 0.0f, 0.0f));
                     Pintar(PiernaInfIzqModel, mPantIzq);
-                    glm::mat4 mPieIzq = Articular(mPantIzq, PIV_TOBILLO_IZQ, CERO);
+                    glm::mat4 mPieIzq = Articular(mPantIzq, PIV_TOBILLO_IZQ, glm::vec3(-sDeg, -12.0f * frenada, 0.0f));
                     Pintar(PieIzqModel, mPieIzq);
-                    glm::mat4 mSkiIzq = Articular(mPieIzq, PIV_SKI_IZQ, glm::vec3(rotRodillas, 0.0f, 0.0f));
-                    Pintar(SkiIzqModel, mPieIzq);
 
-                    // 4. PIERNA DERECHA (fase opuesta)
-                    glm::mat4 mMusloDer = Articular(mCadera, PIV_MUSLO_DER, glm::vec3(-oscPiernas, 0.0f, 0.0f));
+                    // 5. PIERNA DERECHA (misma pose: esquís paralelos)
+                    glm::mat4 mMusloDer = Articular(mCadera, PIV_MUSLO_DER, glm::vec3(-aDeg, 0.0f, 0.0f));
                     Pintar(PiernaSupDerModel, mMusloDer);
-                    glm::mat4 mPantDer = Articular(mMusloDer, PIV_RODILLA_DER, glm::vec3(0.0f, 0.0f, 0.0f));
+                    glm::mat4 mPantDer = Articular(mMusloDer, PIV_RODILLA_DER, glm::vec3(aDeg + sDeg + rotRodillas, 0.0f, 0.0f));
                     Pintar(PiernaInfDerModel, mPantDer);
-                    glm::mat4 mPieDer = Articular(mPantDer, PIV_TOBILLO_DER, CERO);
+                    glm::mat4 mPieDer = Articular(mPantDer, PIV_TOBILLO_DER, glm::vec3(-sDeg, 12.0f * frenada, 0.0f));
                     Pintar(PieDerModel, mPieDer);
-                    glm::mat4 mSkiDer = Articular(mPieDer, PIV_SKI_DER, glm::vec3(rotRodillas, 0.0f, 0.0f));
-                    Pintar(SkiDerModel, mSkiDer);
 
-                    // 5. TREN SUPERIOR: Cadera -> Cintura -> Pecho -> Cuello -> Cabeza
-                    glm::mat4 mCintura = Articular(mCadera, PIV_CINTURA, glm::vec3(incTorso, 0.0f, 0.0f));
+                    // 6. TREN SUPERIOR: Cintura (inclinación) -> Pecho (contrarrotación) -> Cuello -> Cabeza
+                    glm::mat4 mCintura = Articular(mCadera, PIV_CINTURA, glm::vec3(inclTronco, 0.0f, 0.0f));
                     Pintar(CinturaModel, mCintura);
-                    glm::mat4 mPecho = Articular(mCintura, PIV_PECHO, glm::vec3(rotTorso, 0.0f, 0.0f)); // rotTorso (tecla Z) = prueba de pivote
+                    glm::mat4 mPecho = Articular(mCintura, PIV_PECHO, glm::vec3(rotTorso, 8.0f * giro, 0.0f));
                     Pintar(PechoModel, mPecho);
-                    glm::mat4 mCuello = Articular(mPecho, PIV_CUELLO, CERO);
+                    glm::mat4 mCuello = Articular(mPecho, PIV_CUELLO, glm::vec3(-0.3f * inclTronco, 0.0f, 0.0f));
                     Pintar(CuelloModel, mCuello);
-                    glm::mat4 mCabeza = Articular(mCuello, PIV_CABEZA, glm::vec3(rotCabeza, 0.0f, 0.0f));
+                    glm::mat4 mCabeza = Articular(mCuello, PIV_CABEZA, glm::vec3(-0.5f * inclTronco + rotCabeza, -18.0f * giro, 0.0f));
                     Pintar(CabezaModel, mCabeza);
 
-                    // 6. BRAZO IZQUIERDO: Pecho -> Hombro -> Brazo -> Antebrazo -> Mano
+                    // 7. BRAZO IZQUIERDO (el brazo exterior a la curva se abre, el interior se cierra)
                     glm::mat4 mHombroIzq = Articular(mPecho, PIV_HOMBRO_IZQ, CERO);
                     Pintar(HombroIzqModel, mHombroIzq);
-                    glm::mat4 mBrazoIzq = Articular(mHombroIzq, PIV_HOMBRO_IZQ, glm::vec3(-oscPiernas, 0.0f, 0.0f));
+                    glm::mat4 mBrazoIzq = Articular(mHombroIzq, PIV_HOMBRO_IZQ, glm::vec3(-brazoAdelante - inclTronco, 0.0f, abd + 0.8f * incLat));
                     Pintar(BrazoIzqModel, mBrazoIzq);
-                    glm::mat4 mAntebIzq = Articular(mBrazoIzq, PIV_CODO_IZQ, glm::vec3(rotCodos, 0.0f, 0.0f));
+                    glm::mat4 mAntebIzq = Articular(mBrazoIzq, PIV_CODO_IZQ, glm::vec3(-flexCodo + rotCodos, 0.0f, 0.0f));
                     Pintar(AntebrazoIzqModel, mAntebIzq);
                     glm::mat4 mManoIzq = Articular(mAntebIzq, PIV_MUNECA_IZQ, CERO);
                     Pintar(ManoIzqModel, mManoIzq);
 
-                    // 7. BRAZO DERECHO
+                    // 8. BRAZO DERECHO
                     glm::mat4 mHombroDer = Articular(mPecho, PIV_HOMBRO_DER, CERO);
                     Pintar(HombroDerModel, mHombroDer);
-                    glm::mat4 mBrazoDer = Articular(mHombroDer, PIV_HOMBRO_DER, glm::vec3(oscPiernas, 0.0f, 0.0f));
+                    glm::mat4 mBrazoDer = Articular(mHombroDer, PIV_HOMBRO_DER, glm::vec3(-brazoAdelante - inclTronco, 0.0f, -abd + 0.8f * incLat));
                     Pintar(BrazoDerModel, mBrazoDer);
-                    glm::mat4 mAntebDer = Articular(mBrazoDer, PIV_CODO_DER, CERO);
+                    glm::mat4 mAntebDer = Articular(mBrazoDer, PIV_CODO_DER, glm::vec3(-flexCodo + rotCodos, 0.0f, 0.0f));
                     Pintar(AntebrazoDerModel, mAntebDer);
                     glm::mat4 mManoDer = Articular(mAntebDer, PIV_MUNECA_DER, CERO);
                     Pintar(ManoDerModel, mManoDer);
@@ -1703,15 +1730,18 @@ int main()
             // 1. Dibujar al Jugador
             AsignarSkinsContrincantes();
             DibujarEsquiador(skierPos, skierRotY, inclinacionLateral, inclinacionTorso,
-                oscilacionPiernas, opcionesTrajes[indiceTrajeActual], glm::vec3(0.85f, 0.85f, 0.85f));
+                oscilacionPiernas, agachadoAnim, frenadaAnim,
+                opcionesTrajes[indiceTrajeActual], glm::vec3(0.85f, 0.85f, 0.85f));
 
             // 2. Dibujar a los 2 Contrincantes con sus skins distintas
             glm::vec3 tintesRivales[2] = { glm::vec3(0.95f, 0.80f, 0.80f), glm::vec3(0.80f, 0.90f, 1.00f) };
             for (int r = 0; r < NUM_CONTRINCANTES; r++)
             {
                 const Contrincante& c = contrincantes[r];
+                float ratioRival = glm::clamp(c.velActual / NIVELES[nivelActual].velocidadDescenso, 0.0f, 1.0f);
                 DibujarEsquiador(c.pos, c.rotY, c.inclinacionLat, c.inclinacionTorso,
-                    c.oscilacionPiernas, opcionesTrajes[c.indiceTraje], tintesRivales[r]);
+                    c.oscilacionPiernas, 0.2f + 0.8f * ratioRival, 0.0f,
+                    opcionesTrajes[c.indiceTraje], tintesRivales[r]);
             }
             glUniform3f(glGetUniformLocation(lightingShader.Program, "material.diffuse"), 0.8f, 0.8f, 0.8f);
         }   // Fin del bloque exclusivo de la pista
@@ -2797,15 +2827,15 @@ static void DibujarVentisca(Shader& hud)
 void DibujarHUDHub(Shader& hudShader)
 {
     glDisable(GL_DEPTH_TEST);
-// HEAD
+    // HEAD
     glEnable(GL_BLEND); // <-- AGREGA ESTA LÍNEA AQUÍ
-//=======
+    //=======
 
-    //xcc- activa transparencia para los textos del Hub
+        //xcc- activa transparencia para los textos del Hub
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-//>>>>>>> 1f4a45934444d6aa627f9ff3bc9f8a0cc32858dc
+    //>>>>>>> 1f4a45934444d6aa627f9ff3bc9f8a0cc32858dc
     hudShader.Use();
 
     glm::mat4 ortho = glm::ortho(0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT, 0.0f);
@@ -3111,6 +3141,16 @@ void DoMovement()
     if (keys[GLFW_KEY_W] || keys[GLFW_KEY_UP])     objetivoInclinacionTorso = 8.0f;
     if (keys[GLFW_KEY_S] || keys[GLFW_KEY_DOWN])  objetivoInclinacionTorso = -10.0f;
     inclinacionTorso = Suavizar(inclinacionTorso, objetivoInclinacionTorso, 8.0f, deltaTime);
+
+    // Postura de esquiador: se agacha según la velocidad; S activa la frenada
+    float ratioVel = (ambienteActual.velocidadDescenso > 0.01f)
+        ? glm::clamp(velActual / ambienteActual.velocidadDescenso, 0.0f, 1.0f) : 0.0f;
+    bool frenando = (estadoCarrera == 1) && (modoCamara == 1) &&
+        (keys[GLFW_KEY_S] || keys[GLFW_KEY_DOWN]) && velActual > 0.5f;
+    float objAgachado = frenando ? 0.30f : (0.20f + 0.80f * ratioVel);
+    agachadoAnim = Suavizar(agachadoAnim, objAgachado, 3.0f, deltaTime);
+    frenadaAnim = Suavizar(frenadaAnim, frenando ? 1.0f : 0.0f, 6.0f, deltaTime);
+
     // Niebla manual: se suma al valor del nivel (limitada en el render)
     if (keys[GLFW_KEY_N])
         ajusteNieblaManual = glm::min(ajusteNieblaManual + 0.00005f, 0.02f);
