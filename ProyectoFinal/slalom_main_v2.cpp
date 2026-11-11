@@ -173,6 +173,22 @@ const glm::vec3 PIV_CASCO(-0.083644f, 3.49318f, 0.020631f);
 const glm::vec3 PIV_SUELO(-0.093f, 0.0f, 0.0f);   // entre los esquís, a nivel del suelo (eje de inclinación lateral)
 const float LONG_MUSLO = PIV_MUSLO_IZQ.y - PIV_RODILLA_IZQ.y;   // ~0.908
 const float LONG_PANTORRILLA = PIV_RODILLA_IZQ.y - PIV_TOBILLO_IZQ.y;   // ~1.019
+
+// ---- Recepcionista del Hub ----
+const glm::vec3 RECEP_POS(-17.2307f, 0.0f, 15.0674f);   // x,z de la silla; y = altura del piso (ajustar)
+const float RECEP_ROT_Y = 180.0f;    // 0 = mira hacia +Z (la puerta); 180 = hacia el escritorio. Prueba 0/90/180/270
+const float RECEP_ESCALA = 5.0f;    // ajustar a ojo (hub: ojos a 5.0 u. de alto; si el modelo mide ~3.3 u., prueba ~1.6)
+const float RECEP_RADIO_SALUDO = 9.0f;    // distancia (en XZ) a la que empieza a saludar
+const float RECEP_DURACION_SALUDO = 2.8f;    // segundos del saludo completo
+
+// Pivotes en coordenadas ABSOLUTAS del .obj (Blender (x,y,z) -> (x, z, -y)). ¡Placeholders!
+const glm::vec3 PIV_RECEP_HOMBRO(-0.30f, 1.20f, 0.00f);
+const glm::vec3 PIV_RECEP_CODO(-0.35f, 0.90f, 0.00f);
+
+bool  recepSaludando = false;
+bool  recepYaSaludo = false;   // evita que repita mientras sigas cerca
+float recepTiempo = 0.0f;
+
 // ---- Impulso con palos y frenada de brazos ----
 const float UMBRAL_VEL_IMPULSO = 0.85f;  // fracción de velocidad máx. a la que termina el impulso
 const float DURACION_IMPULSO_MAX = 3.0f;   // segundos máx. de impulso por pulsación de W
@@ -773,6 +789,59 @@ bool CercaSalidaPista()
     glm::vec3 posicionCamara = camera.GetPosition();
 
     return posicionCamara.z < -7.0f && posicionCamara.x > -7.0f && posicionCamara.x < 7.0f;
+}
+
+// Misma lógica de articulación que el esquiador: M = padre · T(pivote) · R · T(-pivote)
+glm::mat4 ArticularPieza(const glm::mat4& padre, const glm::vec3& pivote, const glm::vec3& rot)
+{
+    glm::mat4 m = glm::translate(padre, pivote);
+    m = glm::rotate(m, glm::radians(rot.z), glm::vec3(0.0f, 0.0f, 1.0f));
+    m = glm::rotate(m, glm::radians(rot.y), glm::vec3(0.0f, 1.0f, 0.0f));
+    m = glm::rotate(m, glm::radians(rot.x), glm::vec3(1.0f, 0.0f, 0.0f));
+    return glm::translate(m, -pivote);
+}
+
+// Detecta cercanía y avanza el reloj del saludo
+void ActualizarRecepcionista(float dt)
+{
+    if (escenaActual != ESCENA_HUB)
+    {
+        recepSaludando = false; recepYaSaludo = false; recepTiempo = 0.0f;
+        return;
+    }
+
+    glm::vec3 p = camera.GetPosition();
+    float dist = glm::length(glm::vec2(p.x - RECEP_POS.x, p.z - RECEP_POS.z));
+
+    if (!recepSaludando && !recepYaSaludo && dist < RECEP_RADIO_SALUDO)
+    {
+        recepSaludando = true;
+        recepYaSaludo = true;
+        recepTiempo = 0.0f;
+    }
+    if (dist > RECEP_RADIO_SALUDO * 1.4f) recepYaSaludo = false;   // se rearma al alejarte
+
+    if (recepSaludando)
+    {
+        recepTiempo += dt;
+        if (recepTiempo >= RECEP_DURACION_SALUDO) { recepSaludando = false; recepTiempo = 0.0f; }
+    }
+}
+
+// alzado: 0 = brazo en reposo, 1 = brazo levantado. oscil: vaivén del antebrazo (grados)
+void CalcularSaludoRecep(float& alzado, float& oscil)
+{
+    alzado = 0.0f; oscil = 0.0f;
+    if (!recepSaludando) return;
+
+    const float tSube = 0.5f, tBaja = 0.5f;
+    float t = recepTiempo, k;
+    if (t < tSube)                                   k = t / tSube;
+    else if (t > RECEP_DURACION_SALUDO - tBaja)      k = (RECEP_DURACION_SALUDO - t) / tBaja;
+    else                                             k = 1.0f;
+    k = glm::clamp(k, 0.0f, 1.0f);
+    alzado = k * k * (3.0f - 2.0f * k);              // suavizado
+    oscil = 22.0f * alzado * std::sin(t * 15.7f);   // ~2.5 saludos por segundo
 }
 
 //xcc- verifica si la camara esta cerca de la entrada a trofeos
@@ -1430,6 +1499,10 @@ int main()
 
     Model CascoModel((char*)"Models/Casco/casco.obj");
 
+    Model RecepCuerpoModel((char*)"Models/Recepcionista/recepcionista_cuerpo.obj");
+    Model RecepBrazoModel((char*)"Models/Recepcionista/recepcionista_brazo_der.obj");
+    Model RecepAntebrazoModel((char*)"Models/Recepcionista/recepcionista_antebrazo_der.obj");
+
     GLuint texturaSkybox = CargarSkybox(CARAS_SKYBOX);
     bool hayTexturaSkybox = (texturaSkybox != 0);
     if (!hayTexturaSkybox)
@@ -1487,6 +1560,7 @@ int main()
 
         // ---- 6.7.2 Actualización lógica ----
         DoMovement();
+        ActualizarRecepcionista(deltaTime);
 
         //xcc- actualiza la logica de carrera solo en la pista
         if (escenaActual == ESCENA_PISTA)
@@ -1627,6 +1701,35 @@ int main()
 
             //xcc- dibuja el exterior del Hub
             HubExterior.Draw(lightingShader);
+
+            // ---- Recepcionista (sentada) con saludo al acercarse ----
+            {
+                glm::mat4 baseR = glm::translate(glm::mat4(1.0f), RECEP_POS);
+                baseR = glm::rotate(baseR, glm::radians(RECEP_ROT_Y), glm::vec3(0.0f, 1.0f, 0.0f));
+                baseR = glm::scale(baseR, glm::vec3(RECEP_ESCALA));
+
+                float alzado, oscil;
+                CalcularSaludoRecep(alzado, oscil);
+
+                // Cuerpo (nodo padre)
+                glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(baseR));
+                RecepCuerpoModel.Draw(lightingShader);
+
+                // Brazo: sale un poco al frente y hacia afuera (brazo derecho = Z negativo)
+                glm::mat4 mBrazoR = ArticularPieza(baseR, PIV_RECEP_HOMBRO,
+                    glm::vec3(-20.0f * alzado, 0.0f, -35.0f * alzado));
+                glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(mBrazoR));
+                RecepBrazoModel.Draw(lightingShader);
+
+                // Antebrazo: el codo se flexiona hacia arriba y la mano se balancea
+                glm::mat4 mAntebR = ArticularPieza(mBrazoR, PIV_RECEP_CODO,
+                    glm::vec3(-150.0f * alzado, 0.0f, oscil));
+                glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(mAntebR));
+                RecepAntebrazoModel.Draw(lightingShader);
+
+                // Restaurar la matriz identidad para lo que se dibuje después
+                glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(glm::mat4(1.0f)));
+            }
         }
         else if (escenaActual == ESCENA_PISTA)//xcc
         {
