@@ -159,7 +159,7 @@ const glm::vec3 PIV_RODILLA_IZQ(0.081512f, 1.09564f, -0.020852f);
 const glm::vec3 PIV_TOBILLO_IZQ(0.08112f, 0.076162f, -0.011668f);
 const glm::vec3 PIV_MUSLO_DER(-0.242427f, 2.0036f, -0.00772f);
 const glm::vec3 PIV_RODILLA_DER(-0.270705f, 1.09588f, -0.008355f);
-const glm::vec3 PIV_TOBILLO_DER(-0.271096f, 0.076409f, 1.69405);
+const glm::vec3 PIV_TOBILLO_DER(-0.271096f, 0.076409f, -0.011668f);
 
 const glm::vec3 PIV_SKI_IZQ(0.10514f, -0.042328f, 0.26877f);
 const glm::vec3 PIV_SKI_DER(-0.252572f, -0.039645f, 0.252299f);
@@ -175,19 +175,37 @@ const float LONG_MUSLO = PIV_MUSLO_IZQ.y - PIV_RODILLA_IZQ.y;   // ~0.908
 const float LONG_PANTORRILLA = PIV_RODILLA_IZQ.y - PIV_TOBILLO_IZQ.y;   // ~1.019
 
 // ---- Recepcionista del Hub ----
-const glm::vec3 RECEP_POS(-17.2307f, 0.0f, 15.0674f);   // x,z de la silla; y = altura del piso (ajustar)
+const glm::vec3 RECEP_POS(-16.2307f, -3.0f, 16.0674f);   // x,z de la silla; y = altura del piso (ajustar)
 const float RECEP_ROT_Y = 180.0f;    // 0 = mira hacia +Z (la puerta); 180 = hacia el escritorio. Prueba 0/90/180/270
-const float RECEP_ESCALA = 5.0f;    // ajustar a ojo (hub: ojos a 5.0 u. de alto; si el modelo mide ~3.3 u., prueba ~1.6)
+const float RECEP_ESCALA = 2.5f;    // ajustar a ojo (hub: ojos a 5.0 u. de alto; si el modelo mide ~3.3 u., prueba ~1.6)
 const float RECEP_RADIO_SALUDO = 9.0f;    // distancia (en XZ) a la que empieza a saludar
 const float RECEP_DURACION_SALUDO = 2.8f;    // segundos del saludo completo
 
 // Pivotes en coordenadas ABSOLUTAS del .obj (Blender (x,y,z) -> (x, z, -y)). ¡Placeholders!
-const glm::vec3 PIV_RECEP_HOMBRO(-0.30f, 1.20f, 0.00f);
-const glm::vec3 PIV_RECEP_CODO(-0.35f, 0.90f, 0.00f);
+const glm::vec3 PIV_RECEP_HOMBRO(0.331799f, 3.02107f, -0.025263f);
+const glm::vec3 PIV_RECEP_CODO(0.473854f, 2.44983f, -0.049436f);
 
 bool  recepSaludando = false;
 bool  recepYaSaludo = false;   // evita que repita mientras sigas cerca
 float recepTiempo = 0.0f;
+
+// ---- Comisario de pista (señal de salida) ----
+const float COMI_LATERAL = 8.0f;    // distancia al eje de la pista (+ derecha, - izquierda)
+const float COMI_AVANCE = 3.0f;    // unidades por delante de la línea de salida
+const float COMI_ESCALA = 1.0f;    // ajustar a ojo (el esquiador mide ~3.5 u.)
+const float COMI_ROT_EXTRA = 0.0f;    // giro extra sobre la dirección de la pista (prueba 0/45/-45)
+
+// Pivote en coordenadas ABSOLUTAS del .obj: Blender (x,y,z) -> (x, z, -y). ¡Placeholder!
+const glm::vec3 PIV_COMI_HOMBRO(-0.53f, 2.95f, -0.03f);
+
+const float COMI_ANG_REPOSO = 0.0f;     // brazo colgando
+const float COMI_ANG_LISTO = -165.0f;  // brazo arriba ("¡listos!")
+const float COMI_ANG_SENAL = -80.0f;   // brazo al frente, horizontal ("¡fuera!")
+const float COMI_TIEMPO_SENAL = 0.8f;   // segundos que mantiene la señal
+
+float comiAnguloBrazo = 0.0f;
+glm::vec3 comiPos(0.0f);
+float comiRotY = 0.0f;
 
 // ---- Impulso con palos y frenada de brazos ----
 const float UMBRAL_VEL_IMPULSO = 0.85f;  // fracción de velocidad máx. a la que termina el impulso
@@ -851,6 +869,29 @@ void ActualizarRecepcionista(float dt)
     }
 }
 
+// El brazo sigue al estado de la carrera: arriba en espera, baja de golpe al arrancar
+void ActualizarComisario(float dt)
+{
+    if (escenaActual != ESCENA_PISTA) return;
+
+    float objetivo, velocidad;   // velocidad en grados/s
+    if (estadoCarrera == 0)
+    {
+        objetivo = COMI_ANG_LISTO; velocidad = 120.0f;
+    }
+    else if (estadoCarrera == 1 && (glfwGetTime() - tiempoInicioCarrera) < COMI_TIEMPO_SENAL)
+    {
+        objetivo = COMI_ANG_SENAL; velocidad = 600.0f;
+    }   // golpe rápido
+    else
+    {
+        objetivo = COMI_ANG_REPOSO; velocidad = 90.0f;
+    }   // regresa lento
+
+    float paso = velocidad * dt;
+    comiAnguloBrazo += glm::clamp(objetivo - comiAnguloBrazo, -paso, paso);
+}
+
 // alzado: 0 = brazo en reposo, 1 = brazo levantado. oscil: vaivén del antebrazo (grados)
 void CalcularSaludoRecep(float& alzado, float& oscil)
 {
@@ -1352,6 +1393,18 @@ GLuint CargarTextura(const char* rutaArchivo)
     return textureID;
 }
 
+// Lo coloca al lado de la salida, apoyado en el terreno
+void PosicionarComisario(Model& terreno)
+{
+    glm::vec2 v(posMeta.x - posSalida.x, posMeta.z - posSalida.z);
+    glm::vec2 dirP = (glm::length(v) > 0.001f) ? glm::normalize(v) : glm::vec2(1.0f, 0.0f);
+    glm::vec2 dirD(dirP.y, -dirP.x);   // "derecha", igual que en InicializarContrincantes
+
+    comiPos.x = posSalida.x + dirP.x * COMI_AVANCE + dirD.x * COMI_LATERAL;
+    comiPos.z = posSalida.z + dirP.y * COMI_AVANCE + dirD.y * COMI_LATERAL;
+    comiPos.y = ObtenerAlturaTerreno(terreno, comiPos.x, comiPos.z, posSalida.y);  // pies al piso
+    comiRotY = glm::degrees(std::atan2(dirP.x, dirP.y)) + COMI_ROT_EXTRA;
+}
 
 // ---- Ventisca ----
 void InicializarCopos();
@@ -1535,6 +1588,9 @@ int main()
     Model RecepBrazoModel((char*)"Models/Recepcionista/recepcionista_brazo_der.obj");
     Model RecepAntebrazoModel((char*)"Models/Recepcionista/recepcionista_antebrazo_der.obj");
 
+    Model ComisarioCuerpoModel((char*)"Models/Comisario/comisario_cuerpo.obj");
+    Model ComisarioBrazoModel((char*)"Models/Comisario/comisario_brazo.obj");
+
     GLuint texturaSkybox = CargarSkybox(CARAS_SKYBOX);
     bool hayTexturaSkybox = (texturaSkybox != 0);
     if (!hayTexturaSkybox)
@@ -1562,6 +1618,7 @@ int main()
 
     // Inicializar posiciones, skins y rutas aleatorias de los 2 contrincantes
     InicializarContrincantes(PistaCompleta);
+    PosicionarComisario(PistaCompleta);
 
     // ------------------------------------------------------------------------
     //  6.7 CICLO PRINCIPAL (GAME LOOP)
@@ -1585,6 +1642,7 @@ int main()
         if (reiniciarContrincantes)
         {
             InicializarContrincantes(PistaCompleta);
+            PosicionarComisario(PistaCompleta);
             // Reasienta al jugador sobre la malla del terreno en la salida
             skierPos.y = ObtenerAlturaTerreno(PistaCompleta, skierPos.x, skierPos.z, posSalida.y) + offsetPiesEsquiador;
             reiniciarContrincantes = false;
@@ -1593,6 +1651,7 @@ int main()
         // ---- 6.7.2 Actualización lógica ----
         DoMovement();
         ActualizarRecepcionista(deltaTime);
+        ActualizarComisario(deltaTime);
 
         //xcc- actualiza la logica de carrera solo en la pista
         if (escenaActual == ESCENA_PISTA)
@@ -1749,7 +1808,7 @@ int main()
 
                 // Brazo: sale un poco al frente y hacia afuera (brazo derecho = Z negativo)
                 glm::mat4 mBrazoR = ArticularPieza(baseR, PIV_RECEP_HOMBRO,
-                    glm::vec3(-20.0f * alzado, 0.0f, -35.0f * alzado));
+                    glm::vec3(-20.0f * alzado, 0.0f, 35.0f * alzado));
                 glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(mBrazoR));
                 RecepBrazoModel.Draw(lightingShader);
 
@@ -2005,6 +2064,20 @@ int main()
             glUniform1i(glGetUniformLocation(lightingShader.Program, "transparency"), 0);
             glUniform2f(glGetUniformLocation(lightingShader.Program, "uvOffset"), 0.0f, 0.0f);
 
+            // ---- Comisario de pista ----
+            glUniform3f(glGetUniformLocation(lightingShader.Program, "material.diffuse"), 0.8f, 0.8f, 0.8f);
+
+            glm::mat4 baseC = glm::translate(glm::mat4(1.0f), comiPos);
+            baseC = glm::rotate(baseC, glm::radians(comiRotY), glm::vec3(0.0f, 1.0f, 0.0f));
+            baseC = glm::scale(baseC, glm::vec3(COMI_ESCALA));
+
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(baseC));
+            ComisarioCuerpoModel.Draw(lightingShader);
+
+            glm::mat4 mBrazoC = ArticularPieza(baseC, PIV_COMI_HOMBRO, glm::vec3(comiAnguloBrazo, 0.0f, 0.0f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(mBrazoC));
+            ComisarioBrazoModel.Draw(lightingShader);
+
             // Lambda reutilizable para dibujar cualquier esquiador articulado (Jugador o Contrincantes)
             auto DibujarEsquiador = [&](const glm::vec3& posEsq, float rotYEsq, float incLat, float incTorso, float oscPiernas, float agachado, float frenada, float frenadaBrazos, float impulso, float fasePalos, float tCel, float wCel, GLuint texTraje, const glm::vec3& tinteDifuso)
                 {
@@ -2091,7 +2164,7 @@ int main()
                     }
 
                     // 1. RAÍZ GLOBAL: origen de los .obj a nivel del suelo (los pies)
-                    glm::mat4 raiz = glm::translate(glm::mat4(1.0f), posEsq - glm::vec3(0.0f, offsetPiesEsquiador - w * cel.salto, 0.0f));
+                    glm::mat4 raiz = glm::translate(glm::mat4(1.0f), posEsq - glm::vec3(0.0f, offsetPiesEsquiador - w * cel.salto - 0.5, 0.0f));
                     raiz = glm::rotate(raiz, glm::radians(rotYEsq + w * cel.giro), glm::vec3(0.0f, 1.0f, 0.0f));
 
                     auto Articular = [](const glm::mat4& padre, const glm::vec3& pivote, const glm::vec3& rot)
