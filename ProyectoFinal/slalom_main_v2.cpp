@@ -94,6 +94,25 @@ const float ANGULO_GIRO_ESQUIADOR = 18.0f;  // Inclinación del esquiador al des
 const float FOV_BASE_GRADOS = 58.0f;  // Campo de visión base (grados)
 const float FOV_MAXIMO_GRADOS = 100.0f; // Tope de seguridad del campo de visión
 
+// ---- Cámara tercera persona (suavizado) ----
+const float TASA_YAW_CAMARA = 2.0f;   // giro de la cámara (menor = más lenta)
+const float TASA_ALTURA_CAMARA = 3.0f;   // altura de la cámara sobre el terreno
+const float TASA_OBJETIVO_CAMARA = 4.0f;   // altura del punto al que mira
+const float TASA_FOV_CAMARA = 1.5f;   // ensanchamiento del FOV
+const float FACTOR_FOV_DINAMICO = 0.5f;   // fracción del ensanchamiento original
+const float FACTOR_VIBRACION_CAM = 0.20f;  // fracción de la vibración original
+const float RETRASO_MENSAJES_META = 3.0f;   // segundos antes de mostrar resultados
+
+float tiempoCel = 0.0f;   // segundos desde que cruzó la meta
+float pesoCel = 0.0f;   // 0 = pose normal, 1 = pose de la animación
+float camGiroCel = 0.0f;   // 0 = cámara detrás, 1 = cámara delante
+
+bool  camSuaveInit = false;   // false = reinicializar al siguiente cuadro
+float camYawSuave = 0.0f;
+float camYSuave = 0.0f;
+float camTargetYSuave = 0.0f;
+float velNormCamSuave = 0.0f;
+float fovMultSuave = 1.0f;
 // ---- Pista ----
 const float ANCHO_MEDIO_PISTA = 60.0f;   // Distancia máxima al eje de la pista (unidades)
 const float SEPARACION_POSTES = 20.0f;   // Separación entre postes de límite a lo largo de la pista
@@ -457,9 +476,7 @@ const int   NUM_KEYS_CEL = sizeof(KEYS_CELEBRACION) / sizeof(KEYS_CELEBRACION[0]
 const float CEL_LOOP_INICIO = 2.20f;   // el último tramo se repite entre estos dos tiempos
 const float CEL_LOOP_FIN = 4.70f;
 
-float tiempoCel = 0.0f;   // segundos desde que cruzó la meta
-float pesoCel = 0.0f;   // 0 = pose normal, 1 = pose de la animación
-float camGiroCel = 0.0f;   // 0 = cámara detrás, 1 = cámara delante
+
 
 PoseCelebracion EvaluarCelebracion(float t)
 {
@@ -1503,28 +1520,53 @@ int main()
         }
         else
         {
-            // Posición trasera de la cámara, sin atravesar el terreno
-            float angCam = skierRotY + 180.0f * camGiroCel;
-            glm::vec3 offset(-sin(glm::radians(angCam)) * 12.0f, 6.0f, -cos(glm::radians(angCam)) * 12.0f);
-            glm::vec3 camPos = skierPos + offset;
-            float alturaPisoCamara = ObtenerAlturaTerreno(PistaCompleta, camPos.x, camPos.z, camPos.y);
-            if (camPos.y < alturaPisoCamara + 4.0f)
-                camPos.y = alturaPisoCamara + 4.0f;
+            // Yaw objetivo (detrás del esquiador; delante durante la celebración)
+            float angObjetivo = skierRotY + 180.0f * camGiroCel;
+            float alturaPiso0 = ObtenerAlturaTerreno(PistaCompleta, skierPos.x, skierPos.z, skierPos.y);
 
-            // Vibración de cámara: sensación de velocidad según la dificultad
-            if (estadoCarrera == 1)
+            if (!camSuaveInit)
             {
-                float vib = ambienteActual.amplitudVibracion * velNorm;
-                camPos.x += vib * std::sin(currentFrame * 41.0f);
-                camPos.y += vib * std::sin(currentFrame * 53.0f + 1.7f);
+                camYawSuave = angObjetivo;
+                camYSuave = glm::max(skierPos.y + 6.0f, alturaPiso0 + 4.0f);
+                camTargetYSuave = skierPos.y + 1.0f;
+                velNormCamSuave = velNorm;
+                fovMultSuave = 1.0f;
+                camSuaveInit = true;
             }
 
-            glm::vec3 target = skierPos + glm::vec3(0.0f, 1.0f, 0.0f);
+            camYawSuave = Suavizar(camYawSuave, angObjetivo, TASA_YAW_CAMARA, deltaTime);
+            velNormCamSuave = Suavizar(velNormCamSuave, velNorm, 3.0f, deltaTime);
+
+            // XZ: pegado al esquiador (sin retraso), con yaw suavizado
+            glm::vec3 camPos(
+                skierPos.x - std::sin(glm::radians(camYawSuave)) * 12.0f,
+                0.0f,
+                skierPos.z - std::cos(glm::radians(camYawSuave)) * 12.0f);
+
+            // Y: suavizada para absorber baches del terreno
+            float alturaPisoCamara = ObtenerAlturaTerreno(PistaCompleta, camPos.x, camPos.z, skierPos.y);
+            float yDeseada = glm::max(skierPos.y + 6.0f, alturaPisoCamara + 4.0f);
+            camYSuave = Suavizar(camYSuave, yDeseada, TASA_ALTURA_CAMARA, deltaTime);
+            camYSuave = glm::max(camYSuave, alturaPisoCamara + 2.5f);   // nunca bajo el terreno
+            camPos.y = camYSuave;
+
+            // Vibración reducida y de menor frecuencia
+            if (estadoCarrera == 1)
+            {
+                float vib = ambienteActual.amplitudVibracion * velNormCamSuave * FACTOR_VIBRACION_CAM;
+                camPos.x += vib * std::sin(currentFrame * 9.0f);
+                camPos.y += vib * std::sin(currentFrame * 13.0f + 1.7f);
+            }
+
+            camTargetYSuave = Suavizar(camTargetYSuave, skierPos.y + 1.0f, TASA_OBJETIVO_CAMARA, deltaTime);
+            glm::vec3 target(skierPos.x, camTargetYSuave, skierPos.z);
             view = glm::lookAt(camPos, target, glm::vec3(0.0f, 1.0f, 0.0f));
             currentViewPos = camPos;
 
-            // FOV dinámico: se ensancha al aumentar la velocidad
-            fov *= 1.0f + (ambienteActual.factorFov - 1.0f) * velNorm;
+            // FOV dinámico suavizado y más discreto
+            float fovMultObj = 1.0f + (ambienteActual.factorFov - 1.0f) * FACTOR_FOV_DINAMICO * velNormCamSuave;
+            fovMultSuave = Suavizar(fovMultSuave, fovMultObj, TASA_FOV_CAMARA, deltaTime);
+            fov *= fovMultSuave;
         }
 
         fov = glm::clamp(fov, glm::radians(20.0f), glm::radians(FOV_MAXIMO_GRADOS));
@@ -2087,8 +2129,8 @@ int main()
         {
             DibujarHUD(hudShader);
 
-            //xcc- muestra el regreso al Hub antes de iniciar o al terminar
-            if (estadoCarrera == 0 || estadoCarrera == 2)
+            //xcc- muestra el regreso al Hub antes de iniciar o al terminar (con retraso)
+            if (estadoCarrera == 0 || (estadoCarrera == 2 && glfwGetTime() >= tiempoMensajeMeta)) // <--- ACTUALIZAR CONDICIÓN
                 DibujarAvisoVolverHub(hudShader);
         }
         else if (escenaActual == ESCENA_TROFEOS)
@@ -2982,7 +3024,7 @@ void ActualizarCarrera(Model& terreno)
     {
         estadoCarrera = 2;
         tiempoFinalCarrera = tiempoActualCarrera;
-        tiempoMensajeMeta = ahora;
+        tiempoMensajeMeta = ahora + RETRASO_MENSAJES_META;   // <--- ACTUALIZAR (añadir + RETRASO)
         velActual = 0.0f;
         //xcc- desbloquea trofeo por tiempo en dificultad facil
         if (nivelActual == 0 && tiempoFinalCarrera <= TIEMPO_TROFEO_FACIL)
@@ -3701,6 +3743,8 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
     //xcc- cambia del Hub a la pista cerca de la salida donde dice "pista"
     if (key == GLFW_KEY_E && action == GLFW_PRESS && escenaActual == ESCENA_HUB && CercaSalidaPista())
     {
+        camSuaveInit = false; // <--- AÑADIR
+
         escenaActual = ESCENA_PISTA;
         modoCamara = 1;
 
@@ -3734,6 +3778,8 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
     if (key == GLFW_KEY_H && action == GLFW_PRESS &&
         (escenaActual == ESCENA_PISTA || escenaActual == ESCENA_TROFEOS))
     {
+        camSuaveInit = false; // <--- AÑADIR
+
         escenaActual = ESCENA_HUB;
         modoCamara = 0;
         camera.SetPosition(glm::vec3(0.0f, 3.0f, 30.0f));
@@ -3807,6 +3853,8 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 
 
     {
+        camSuaveInit = false; // <--- AÑADIR
+
         skierPos = posSalida;
         estadoCarrera = 1;
         modoCamara = 1;
@@ -3828,6 +3876,8 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
     // Regreso a la salida
     if (key == GLFW_KEY_T && action == GLFW_PRESS)
     {
+        camSuaveInit = false; // <--- AÑADIR
+
         skierPos = posSalida;
         estadoCarrera = 0;
         velActual = 0.0f;
