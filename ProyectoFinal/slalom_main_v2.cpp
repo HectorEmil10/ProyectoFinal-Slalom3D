@@ -3393,6 +3393,8 @@ float AlphaMensaje(double inicio, float sostener, float desvanecer)
     if (inicio < 0.0)
         return 0.0f;
     float t = (float)(glfwGetTime() - inicio);
+    if (t < 0.0f)
+        return 0.0f;            // <-- NUEVO: programado a futuro, aún no se muestra
     if (t <= sostener)
         return 1.0f;
     if (t >= sostener + desvanecer)
