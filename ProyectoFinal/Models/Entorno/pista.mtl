@@ -61,6 +61,26 @@ d 1.000000
 illum 2
 map_Kd snow_pista.png
 
+newmtl Material.002
+Ns 26.151674
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd slalom_banderas.png
+
+newmtl Material.003
+Ns 26.151674
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd slalom_banderas.png
+
 newmtl Spring.001
 Ns 1.688962
 Ka 1.000000 1.000000 1.000000
