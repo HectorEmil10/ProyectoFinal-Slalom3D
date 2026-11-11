@@ -148,6 +148,8 @@ const glm::vec3 PIV_SKI_DER(-0.252572f, -0.039645f, 0.252299f);
 const glm::vec3 PIV_POLE_IZQ(0.546009f, 1.82591f, -0.038445f);
 const glm::vec3 PIV_POLE_DER(-0.73605f, 1.82721f, -0.039651f);
 
+const glm::vec3 PIV_CASCO(-0.083644f, 3.49318f, 0.020631f);
+
 // ---- Parámetros de la pose ---- COPIAR A REPO
 const glm::vec3 PIV_SUELO(-0.093f, 0.0f, 0.0f);   // entre los esquís, a nivel del suelo (eje de inclinación lateral)
 const float LONG_MUSLO = PIV_MUSLO_IZQ.y - PIV_RODILLA_IZQ.y;   // ~0.908
@@ -416,6 +418,76 @@ float impulsoAnim = 0.0f;   // peso de la animación de impulso (0..1)
 float fasePalos = -1.5708f; // fase del ciclo de empuje
 float tiempoImpulso = 0.0f;
 float tiempoFrenada = 0.0f;
+
+// ============================================================================
+//  Animación por keyframes: celebración del jugador
+// ============================================================================
+struct PoseBrazo { float adelante, abre, codo; };   // grados: adelante (+ al frente), abre (+ hacia afuera), codo (flexión)
+struct PoseCelebracion
+{
+    float salto;      // elevación sobre el suelo (unidades del mundo)
+    float giro;       // giro extra sobre el eje vertical (grados)
+    float agachado;   // 0 = piernas estiradas, 1 = posición de huevo
+    float tronco;     // inclinación del tronco (+ adelante)
+    float roll;       // inclinación lateral (grados)
+    float cabeza;     // cabeceo extra de la cabeza (+ hacia abajo)
+    PoseBrazo izq, der;
+};
+struct KeyframeCel { float t; PoseCelebracion pose; };
+
+const KeyframeCel KEYS_CELEBRACION[] =
+{
+    //   t      salto  giro   agach  tronco roll  cabeza   brazo izq {adel, abre, codo}   brazo der {adel, abre, codo}
+    { 0.00f, { 0.00f,   0.0f, 0.25f, 10.0f,  0.0f,   0.0f, { 20.0f,  10.0f, 25.0f }, { 20.0f,  10.0f, 25.0f } } },  // reposo
+    { 0.60f, { 0.00f,   0.0f, 0.90f, 28.0f,  0.0f,   0.0f, {-30.0f,  15.0f, 10.0f }, {-30.0f,  15.0f, 10.0f } } },  // agacharse
+    { 1.20f, { 1.00f, 180.0f, 0.00f, -5.0f,  0.0f, -10.0f, {  0.0f, 150.0f,  0.0f }, {  0.0f, 150.0f,  0.0f } } },  // salto
+    { 1.70f, { 0.00f, 360.0f, 0.75f, 15.0f,  0.0f,   0.0f, {  0.0f, 120.0f, 20.0f }, {  0.0f, 120.0f, 20.0f } } },  // aterriza
+    { 2.20f, { 0.00f, 360.0f, 0.15f, -4.0f,  0.0f, -12.0f, {  0.0f, 150.0f,  0.0f }, {  0.0f, 150.0f,  0.0f } } },  // brazos en V  <- inicio del bucle
+    { 2.70f, { 0.15f, 360.0f, 0.30f,  0.0f,  6.0f,  -8.0f, {  0.0f, 150.0f,  0.0f }, { 45.0f,  55.0f, 75.0f } } },  // puño derecho
+    { 3.20f, { 0.30f, 360.0f, 0.10f, -4.0f,  0.0f, -12.0f, {  0.0f, 150.0f,  0.0f }, {  0.0f, 150.0f,  0.0f } } },  // saltito
+    { 3.70f, { 0.15f, 360.0f, 0.30f,  0.0f, -6.0f,  -8.0f, { 45.0f,  55.0f, 75.0f }, {  0.0f, 150.0f,  0.0f } } },  // puño izquierdo
+    { 4.20f, { 0.30f, 360.0f, 0.10f, -4.0f,  0.0f, -12.0f, {  0.0f, 150.0f,  0.0f }, {  0.0f, 150.0f,  0.0f } } },  // saltito
+    { 4.70f, { 0.00f, 360.0f, 0.15f, -4.0f,  0.0f, -12.0f, {  0.0f, 150.0f,  0.0f }, {  0.0f, 150.0f,  0.0f } } },  // = keyframe de t=2.20 (cierra el bucle)
+};
+const int   NUM_KEYS_CEL = sizeof(KEYS_CELEBRACION) / sizeof(KEYS_CELEBRACION[0]);
+const float CEL_LOOP_INICIO = 2.20f;   // el último tramo se repite entre estos dos tiempos
+const float CEL_LOOP_FIN = 4.70f;
+
+float tiempoCel = 0.0f;   // segundos desde que cruzó la meta
+float pesoCel = 0.0f;   // 0 = pose normal, 1 = pose de la animación
+float camGiroCel = 0.0f;   // 0 = cámara detrás, 1 = cámara delante
+
+PoseCelebracion EvaluarCelebracion(float t)
+{
+    // Pasado el último keyframe, se repite el tramo [LOOP_INICIO, LOOP_FIN]
+    if (t > CEL_LOOP_FIN)
+        t = CEL_LOOP_INICIO + std::fmod(t - CEL_LOOP_INICIO, CEL_LOOP_FIN - CEL_LOOP_INICIO);
+
+    // Segmento [i, i+1] que contiene a t
+    int i = 0;
+    while (i < NUM_KEYS_CEL - 2 && t > KEYS_CELEBRACION[i + 1].t) i++;
+    const PoseCelebracion& A = KEYS_CELEBRACION[i].pose;
+    const PoseCelebracion& B = KEYS_CELEBRACION[i + 1].pose;
+
+    float k = (t - KEYS_CELEBRACION[i].t) / (KEYS_CELEBRACION[i + 1].t - KEYS_CELEBRACION[i].t);
+    k = glm::clamp(k, 0.0f, 1.0f);
+    k = k * k * (3.0f - 2.0f * k);   // suavizado de entrada/salida (smoothstep)
+
+    auto L = [k](float a, float b) { return a + (b - a) * k; };
+    auto LB = [&](const PoseBrazo& a, const PoseBrazo& b)
+        { return PoseBrazo{ L(a.adelante, b.adelante), L(a.abre, b.abre), L(a.codo, b.codo) }; };
+
+    PoseCelebracion r;
+    r.salto = L(A.salto, B.salto);
+    r.giro = L(A.giro, B.giro);
+    r.agachado = L(A.agachado, B.agachado);
+    r.tronco = L(A.tronco, B.tronco);
+    r.roll = L(A.roll, B.roll);
+    r.cabeza = L(A.cabeza, B.cabeza);
+    r.izq = LB(A.izq, B.izq);
+    r.der = LB(A.der, B.der);
+    return r;
+}
 
 // ---- Dificultad / clima ----
 int nivelActual = 0;
@@ -1324,6 +1396,8 @@ int main()
     Model PoleDerModel((char*)"Models/SkiPoles/pole_der.obj");
     Model PoleIzqModel((char*)"Models/SkiPoles/pole_izq.obj");
 
+    Model CascoModel((char*)"Models/Casco/casco.obj");
+
     GLuint texturaSkybox = CargarSkybox(CARAS_SKYBOX);
     bool hayTexturaSkybox = (texturaSkybox != 0);
     if (!hayTexturaSkybox)
@@ -1415,7 +1489,8 @@ int main()
         else
         {
             // Posición trasera de la cámara, sin atravesar el terreno
-            glm::vec3 offset(-sin(glm::radians(skierRotY)) * 12.0f, 6.0f, -cos(glm::radians(skierRotY)) * 12.0f);
+            float angCam = skierRotY + 180.0f * camGiroCel;
+            glm::vec3 offset(-sin(glm::radians(angCam)) * 12.0f, 6.0f, -cos(glm::radians(angCam)) * 12.0f);
             glm::vec3 camPos = skierPos + offset;
             float alturaPisoCamara = ObtenerAlturaTerreno(PistaCompleta, camPos.x, camPos.z, camPos.y);
             if (camPos.y < alturaPisoCamara + 4.0f)
@@ -1724,7 +1799,7 @@ int main()
             glUniform2f(glGetUniformLocation(lightingShader.Program, "uvOffset"), 0.0f, 0.0f);
 
             // Lambda reutilizable para dibujar cualquier esquiador articulado (Jugador o Contrincantes)
-            auto DibujarEsquiador = [&](const glm::vec3& posEsq, float rotYEsq, float incLat, float incTorso, float oscPiernas, float agachado, float frenada, float frenadaBrazos, float impulso, float fasePalos, GLuint texTraje, const glm::vec3& tinteDifuso)
+            auto DibujarEsquiador = [&](const glm::vec3& posEsq, float rotYEsq, float incLat, float incTorso, float oscPiernas, float agachado, float frenada, float frenadaBrazos, float impulso, float fasePalos, float tCel, float wCel, GLuint texTraje, const glm::vec3& tinteDifuso)
                 {
                     glActiveTexture(GL_TEXTURE0);
                     glBindTexture(GL_TEXTURE_2D, texTraje);
@@ -1753,6 +1828,17 @@ int main()
                     ForzarTexturaEnModelo(ManoDerModel, texTraje);
 
                     // ===== POSE DEL ESQUIADOR =====
+// 
+                    // ===== CELEBRACIÓN (keyframes): se mezcla con la pose normal según el peso wCel =====
+                    const float w = wCel;
+                    PoseCelebracion cel = {};
+                    if (w > 0.001f)
+                    {
+                        cel = EvaluarCelebracion(tCel);
+                        incLat = glm::mix(incLat, cel.roll, w);   // los parámetros son copias: se pueden modificar
+                        agachado = glm::mix(agachado, cel.agachado, w);
+                    }
+
                     const float giro = glm::clamp(incLat / ANGULO_GIRO_ESQUIADOR, -1.0f, 1.0f);  // -1 izq ... +1 der
                     const float rebote = oscPiernas / 12.0f;                                       // -1..1 (amortiguación)
 
@@ -1771,7 +1857,7 @@ int main()
                     const float sDeg = glm::degrees(sPant);
 
                     // Tronco, brazos y cabeza
-                    const float inclTronco = glm::mix(8.0f + 40.0f * crouch, -6.0f, frenada)
+                    float inclTronco = glm::mix(8.0f + 40.0f * crouch, -6.0f, frenada)
                         + 0.5f * incTorso + imp * (4.0f + 10.0f * pushW);   // el tronco acompaña el empuje
 
                     const float brazoBase = glm::mix(10.0f + 30.0f * crouch, 5.0f, frenadaBrazos);
@@ -1782,10 +1868,24 @@ int main()
 
                     const float abd = 8.0f + 45.0f * frenadaBrazos;   // apertura lateral (ahora temporal)
 
+                    // Valores por brazo (en la celebración cada brazo puede ir distinto)
+                    float brazoAdelIzq = brazoAdelante, brazoAdelDer = brazoAdelante;
+                    float abdIzq = abd, abdDer = abd;
+                    float codoIzq = flexCodo, codoDer = flexCodo;
+                    if (w > 0.001f)
+                    {
+                        inclTronco = glm::mix(inclTronco, cel.tronco, w);
+                        brazoAdelIzq = glm::mix(brazoAdelIzq, cel.izq.adelante, w);
+                        abdIzq = glm::mix(abdIzq, cel.izq.abre, w);
+                        codoIzq = glm::mix(codoIzq, cel.izq.codo, w);
+                        brazoAdelDer = glm::mix(brazoAdelDer, cel.der.adelante, w);
+                        abdDer = glm::mix(abdDer, cel.der.abre, w);
+                        codoDer = glm::mix(codoDer, cel.der.codo, w);
+                    }
 
                     // 1. RAÍZ GLOBAL: origen de los .obj a nivel del suelo (los pies)
-                    glm::mat4 raiz = glm::translate(glm::mat4(1.0f), posEsq - glm::vec3(0.0f, offsetPiesEsquiador, 0.0f));
-                    raiz = glm::rotate(raiz, glm::radians(rotYEsq), glm::vec3(0.0f, 1.0f, 0.0f));
+                    glm::mat4 raiz = glm::translate(glm::mat4(1.0f), posEsq - glm::vec3(0.0f, offsetPiesEsquiador - w * cel.salto, 0.0f));
+                    raiz = glm::rotate(raiz, glm::radians(rotYEsq + w * cel.giro), glm::vec3(0.0f, 1.0f, 0.0f));
 
                     auto Articular = [](const glm::mat4& padre, const glm::vec3& pivote, const glm::vec3& rot)
                         {
@@ -1838,15 +1938,17 @@ int main()
                     Pintar(PechoModel, mPecho);
                     glm::mat4 mCuello = Articular(mPecho, PIV_CUELLO, glm::vec3(-0.3f * inclTronco, 0.0f, 0.0f));
                     Pintar(CuelloModel, mCuello);
-                    glm::mat4 mCabeza = Articular(mCuello, PIV_CABEZA, glm::vec3(-0.5f * inclTronco + rotCabeza, -18.0f * giro, 0.0f));
+                    glm::mat4 mCabeza = Articular(mCuello, PIV_CABEZA, glm::vec3(-0.5f * inclTronco + rotCabeza + w * cel.cabeza, -18.0f * giro, 0.0f));
                     Pintar(CabezaModel, mCabeza);
+                    glm::mat4 mCasco = Articular(mCabeza, PIV_CASCO, glm::vec3(0.0f, 0.0f, 0.0f));
+                    Pintar(CascoModel, mCasco);
 
                     // 7. BRAZO IZQUIERDO (el brazo exterior a la curva se abre, el interior se cierra)
                     glm::mat4 mHombroIzq = Articular(mPecho, PIV_HOMBRO_IZQ, CERO);
                     Pintar(HombroIzqModel, mHombroIzq);
                     glm::mat4 mBrazoIzq = Articular(mHombroIzq, PIV_HOMBRO_IZQ, glm::vec3(-brazoAdelante - inclTronco, 0.0f, abd + 0.8f * incLat));
                     Pintar(BrazoIzqModel, mBrazoIzq);
-                    glm::mat4 mAntebIzq = Articular(mBrazoIzq, PIV_CODO_IZQ, glm::vec3(-flexCodo + rotCodos, 0.0f, 0.0f));
+                    glm::mat4 mAntebIzq = Articular(mBrazoIzq, PIV_CODO_IZQ, glm::vec3(-codoIzq + rotCodos, 0.0f, 0.0f));
                     Pintar(AntebrazoIzqModel, mAntebIzq);
                     glm::mat4 mManoIzq = Articular(mAntebIzq, PIV_MUNECA_IZQ, CERO);
                     Pintar(ManoIzqModel, mManoIzq);
@@ -1856,9 +1958,9 @@ int main()
                     // 8. BRAZO DERECHO
                     glm::mat4 mHombroDer = Articular(mPecho, PIV_HOMBRO_DER, CERO);
                     Pintar(HombroDerModel, mHombroDer);
-                    glm::mat4 mBrazoDer = Articular(mHombroDer, PIV_HOMBRO_DER, glm::vec3(-brazoAdelante - inclTronco, 0.0f, -abd + 0.8f * incLat));
+                    glm::mat4 mBrazoDer = Articular(mHombroDer, PIV_HOMBRO_DER, glm::vec3(-brazoAdelDer - inclTronco, 0.0f, -abdDer + 0.8f * incLat));
                     Pintar(BrazoDerModel, mBrazoDer);
-                    glm::mat4 mAntebDer = Articular(mBrazoDer, PIV_CODO_DER, glm::vec3(-flexCodo + rotCodos, 0.0f, 0.0f));
+                    glm::mat4 mAntebDer = Articular(mBrazoDer, PIV_CODO_DER, glm::vec3(-codoDer + rotCodos, 0.0f, 0.0f));
                     Pintar(AntebrazoDerModel, mAntebDer);
                     glm::mat4 mManoDer = Articular(mAntebDer, PIV_MUNECA_DER, CERO);
                     Pintar(ManoDerModel, mManoDer);
@@ -1870,8 +1972,10 @@ int main()
 
             // 1. Dibujar al Jugador
             AsignarSkinsContrincantes();
+            // Jugador
             DibujarEsquiador(skierPos, skierRotY, inclinacionLateral, inclinacionTorso,
                 oscilacionPiernas, agachadoAnim, frenadaAnim, frenadaBrazosAnim, impulsoAnim, fasePalos,
+                tiempoCel, pesoCel,
                 opcionesTrajes[indiceTrajeActual], glm::vec3(0.85f, 0.85f, 0.85f));
 
             // 2. Dibujar a los 2 Contrincantes con sus skins distintas
@@ -1882,6 +1986,7 @@ int main()
                 float ratioRival = glm::clamp(c.velActual / NIVELES[nivelActual].velocidadDescenso, 0.0f, 1.0f);
                 DibujarEsquiador(c.pos, c.rotY, c.inclinacionLat, c.inclinacionTorso,
                     c.oscilacionPiernas, 0.2f + 0.8f * ratioRival, 0.0f, 0.0f, 0.0f, 0.0f,
+                    0.0f, 0.0f,
                     opcionesTrajes[c.indiceTraje], tintesRivales[r]);
             }
             glUniform3f(glGetUniformLocation(lightingShader.Program, "material.diffuse"), 0.8f, 0.8f, 0.8f);
@@ -3458,6 +3563,13 @@ void DoMovement()
     if (frenando) tiempoFrenada += deltaTime; else tiempoFrenada = 0.0f;
     bool extenderBrazos = frenando && tiempoFrenada < DURACION_EXT_FRENADA;
     frenadaBrazosAnim = Suavizar(frenadaBrazosAnim, extenderBrazos ? 1.0f : 0.0f, 6.0f, deltaTime);
+
+    // ---- Celebración (keyframes): arranca al cruzar la meta ----
+    bool celebrando = (estadoCarrera == 2);
+    if (celebrando) tiempoCel += deltaTime;
+    pesoCel = Suavizar(pesoCel, celebrando ? 1.0f : 0.0f, 6.0f, deltaTime);
+    if (!celebrando && pesoCel < 0.01f) tiempoCel = 0.0f;   // se reinicia solo tras desvanecerse
+    camGiroCel = Suavizar(camGiroCel, celebrando ? 1.0f : 0.0f, 1.2f, deltaTime);
 
     // Niebla manual: se suma al valor del nivel (limitada en el render)
     if (keys[GLFW_KEY_N])
