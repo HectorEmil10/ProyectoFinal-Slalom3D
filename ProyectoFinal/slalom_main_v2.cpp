@@ -326,6 +326,28 @@ bool trofeosDesbloqueados[9] = {
     false, false, false, false
 };
 
+//xcc- guarda cuales trofeos todavia no han sido vistos en la sala
+bool trofeosNuevos[9] = {
+    false, false, false, false, false,
+    false, false, false, false
+};
+
+//xcc- nombres que se muestran en el aviso de la sala
+const char* NOMBRES_TROFEOS[9] = {
+    "MAESTRO DEL SLALOM",
+    "VELOCISTA FACIL",
+    "VELOCISTA MEDIO",
+    "VELOCISTA DIFICIL",
+    "CAMPEON FACIL",
+    "CAMPEON MEDIO",
+    "CAMPEON DIFICIL",
+    "CONTRA LA TORMENTA",
+    "LEYENDA DEL SLALOM"
+};
+
+//xcc- controla cuanto tiempo aparece el resumen al entrar
+double tiempoMensajeTrofeos = -1.0;
+
 //xcc- controla las luces generales de la sala de trofeos
 bool lucesTrofeosCompletas = false;
 
@@ -616,6 +638,7 @@ static const Glifo GLIFOS[] = {
     { 'T', { 0x1F, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04 } },
     { 'U', { 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E } },
     { 'V', { 0x11, 0x11, 0x11, 0x11, 0x11, 0x0A, 0x04 } },
+    { 'Y', { 0x11, 0x11, 0x0A, 0x04, 0x04, 0x04, 0x04 } },
     { 'Z', { 0x1F, 0x01, 0x02, 0x04, 0x08, 0x10, 0x1F } }
 };
 
@@ -775,6 +798,15 @@ bool CercaInterruptorTrofeos()
 
     float distancia = glm::length(posicionActual - posicionInterruptor);
     return distancia < 2.0f;
+}
+
+//xcc- verifica si la camara esta cerca de la vitrina de trofeos
+bool CercaVitrinaTrofeos()
+{
+    glm::vec3 posicionCamara = camera.GetPosition();
+
+    return posicionCamara.x > -5.7f && posicionCamara.x < 5.7f &&
+        posicionCamara.z > -1.9f && posicionCamara.z < 1.5f;
 }
 
 //xcc- verifica colisiones con los muebles del Hub
@@ -2985,23 +3017,29 @@ void ActualizarCarrera(Model& terreno)
         tiempoMensajeMeta = ahora;
         velActual = 0.0f;
         //xcc- desbloquea trofeo por tiempo en dificultad facil
-        if (nivelActual == 0 && tiempoFinalCarrera <= TIEMPO_TROFEO_FACIL)
+        if (nivelActual == 0 && tiempoFinalCarrera <= TIEMPO_TROFEO_FACIL &&
+            !trofeosDesbloqueados[1])
         {
             trofeosDesbloqueados[1] = true;
+            trofeosNuevos[1] = true;
             std::cout << "Trofeo desbloqueado: Velocista Facil" << std::endl;
         }
 
         //xcc- desbloquea trofeo por tiempo en dificultad media
-        if (nivelActual == 1 && tiempoFinalCarrera <= TIEMPO_TROFEO_MEDIO)
+        if (nivelActual == 1 && tiempoFinalCarrera <= TIEMPO_TROFEO_MEDIO &&
+            !trofeosDesbloqueados[2])
         {
             trofeosDesbloqueados[2] = true;
+            trofeosNuevos[2] = true;
             std::cout << "Trofeo desbloqueado: Velocista Medio" << std::endl;
         }
 
         //xcc- desbloquea trofeo por tiempo en dificultad dificil
-        if (nivelActual == 2 && tiempoFinalCarrera <= TIEMPO_TROFEO_DIFICIL)
+        if (nivelActual == 2 && tiempoFinalCarrera <= TIEMPO_TROFEO_DIFICIL &&
+            !trofeosDesbloqueados[3])
         {
             trofeosDesbloqueados[3] = true;
+            trofeosNuevos[3] = true;
             std::cout << "Trofeo desbloqueado: Velocista Dificil" << std::endl;
         }
 
@@ -3018,6 +3056,7 @@ void ActualizarCarrera(Model& terreno)
         if (puertasCruzadasCorrectamente == (int)puertas.size() && !trofeosDesbloqueados[0])
         {
             trofeosDesbloqueados[0] = true;
+            trofeosNuevos[0] = true;
             std::cout << "Trofeo desbloqueado: Maestro del Slalom" << std::endl;
         }
 
@@ -3027,18 +3066,21 @@ void ActualizarCarrera(Model& terreno)
             if (nivelActual == 0 && !trofeosDesbloqueados[4])
             {
                 trofeosDesbloqueados[4] = true;
+                trofeosNuevos[4] = true;
                 std::cout << "Trofeo desbloqueado: Campeon Facil" << std::endl;
             }
 
             if (nivelActual == 1 && !trofeosDesbloqueados[5])
             {
                 trofeosDesbloqueados[5] = true;
+                trofeosNuevos[5] = true;
                 std::cout << "Trofeo desbloqueado: Campeon Medio" << std::endl;
             }
 
             if (nivelActual == 2 && !trofeosDesbloqueados[6])
             {
                 trofeosDesbloqueados[6] = true;
+                trofeosNuevos[6] = true;
                 std::cout << "Trofeo desbloqueado: Campeon Dificil" << std::endl;
             }
         }
@@ -3047,6 +3089,7 @@ void ActualizarCarrera(Model& terreno)
         if (posicionJugadorActual == 1 && ventiscaActiva && !trofeosDesbloqueados[7])
         {
             trofeosDesbloqueados[7] = true;
+            trofeosNuevos[7] = true;
             std::cout << "Trofeo desbloqueado: Contra la Tormenta" << std::endl;
         }
 
@@ -3058,6 +3101,7 @@ void ActualizarCarrera(Model& terreno)
             !trofeosDesbloqueados[8])
         {
             trofeosDesbloqueados[8] = true;
+            trofeosNuevos[8] = true;
             std::cout << "Trofeo desbloqueado: Leyenda del Slalom" << std::endl;
         }
     }
@@ -3293,15 +3337,12 @@ static void DibujarVentisca(Shader& hud)
 void DibujarHUDHub(Shader& hudShader)
 {
     glDisable(GL_DEPTH_TEST);
-    // HEAD
-    glEnable(GL_BLEND); // <-- AGREGA ESTA LÍNEA AQUÍ
-    //=======
+
 
         //xcc- activa transparencia para los textos del Hub
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    //>>>>>>> 1f4a45934444d6aa627f9ff3bc9f8a0cc32858dc
     hudShader.Use();
 
     glm::mat4 ortho = glm::ortho(0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT, 0.0f);
@@ -3367,6 +3408,86 @@ void DibujarAvisoVolverHub(Shader& hudShader)
 
     DibujarTexto(hudShader, "PRESIONA H PARA VOLVER AL HUB", 0.0f, 35.0f * e, 2.5f * e,
         glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), true);
+    //xcc- muestra como desbloquear los trofeos al acercarse a la vitrina
+    if (escenaActual == ESCENA_TROFEOS && CercaVitrinaTrofeos())
+    {
+        DibujarTexto(hudShader, "COMO DESBLOQUEAR LOS TROFEOS",
+            0.0f, SCREEN_HEIGHT - 145.0f * e, 3.0f * e,
+            glm::vec4(1.0f, 0.85f, 0.3f, 0.95f), true);
+
+        DibujarTexto(hudShader, "MAESTRO - CRUZA TODAS LAS PUERTAS",
+            0.0f, SCREEN_HEIGHT - 185.0f * e, 2.2f * e,
+            glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), true);
+
+        DibujarTexto(hudShader, "VELOCISTA - TERMINA ANTES DEL TIEMPO",
+            0.0f, SCREEN_HEIGHT - 215.0f * e, 2.2f * e,
+            glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), true);
+
+        DibujarTexto(hudShader, "CAMPEON - TERMINA EN PRIMER LUGAR",
+            0.0f, SCREEN_HEIGHT - 245.0f * e, 2.2f * e,
+            glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), true);
+
+        DibujarTexto(hudShader, "TORMENTA - GANA CON VENTISCA",
+            0.0f, SCREEN_HEIGHT - 275.0f * e, 2.2f * e,
+            glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), true);
+
+        DibujarTexto(hudShader, "LEYENDA - CONSIGUE LOS OTROS 8",
+            0.0f, SCREEN_HEIGHT - 305.0f * e, 2.2f * e,
+            glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), true);
+    }
+
+    //xcc- muestra el resumen de trofeos al entrar a la sala
+    if (escenaActual == ESCENA_TROFEOS)
+    {
+        float aTrofeos = AlphaMensaje(tiempoMensajeTrofeos, 4.0f, 1.0f);
+
+        if (aTrofeos > 0.0f)
+        {
+            int totalDesbloqueados = 0;
+            bool hayNuevos = false;
+
+            //xcc- cuenta cuantos trofeos se han conseguido
+            for (int i = 0; i < 9; i++)
+            {
+                if (trofeosDesbloqueados[i])
+                    totalDesbloqueados++;
+
+                if (trofeosNuevos[i])
+                    hayNuevos = true;
+            }
+
+            float yAviso = SCREEN_HEIGHT - 120.0f * e;
+
+            if (hayNuevos)
+                DibujarTexto(hudShader, "NUEVOS TROFEOS", 0.0f, yAviso,
+                    4.0f * e, glm::vec4(1.0f, 0.85f, 0.3f, aTrofeos), true);
+            else
+                DibujarTexto(hudShader, "SALA DE TROFEOS", 0.0f, yAviso,
+                    4.0f * e, glm::vec4(1.0f, 0.85f, 0.3f, aTrofeos), true);
+
+            char progreso[32];
+            std::snprintf(progreso, sizeof(progreso),
+                "PROGRESO: %d / 9", totalDesbloqueados);
+
+            DibujarTexto(hudShader, progreso, 0.0f, yAviso - 45.0f * e,
+                3.0f * e, glm::vec4(1.0f, 1.0f, 1.0f, aTrofeos), true);
+
+            //xcc- escribe solamente los trofeos nuevos
+            float yNombre = yAviso - 85.0f * e;
+
+            for (int i = 0; i < 9; i++)
+            {
+                if (trofeosNuevos[i])
+                {
+                    DibujarTexto(hudShader, NOMBRES_TROFEOS[i],
+                        0.0f, yNombre, 2.5f * e,
+                        glm::vec4(0.45f, 1.0f, 0.55f, aTrofeos), true);
+
+                    yNombre -= 32.0f * e;
+                }
+            }
+        }
+    }
 
     //xcc- muestra el control de luces solo cerca del interruptor
     if (escenaActual == ESCENA_TROFEOS && CercaInterruptorTrofeos())
@@ -3520,11 +3641,13 @@ void DoMovement()
         //xcc- guarda la posicion antes de mover la camara
         glm::vec3 posicionAnterior = camera.GetPosition();
 
-        float velocidadCamara = deltaTime * 12.0f;
+        //xcc- velocidad de movimiento de la camara
+        float velocidadCamara = deltaTime * 4.0f;
+
+        //xcc- movimiento mas lento dentro de la sala de trofeos
         if (escenaActual == ESCENA_TROFEOS)
-            velocidadCamara *= 0.35f;   // Sala más pequeña y cámara más baja: sin esto se siente más rápida
-        if (escenaActual == ESCENA_TROFEOS) velocidadCamara *= 0.35f;   // Sala más pequeña y cámara más baja: sin esto se siente más rápida
-        if (keys[GLFW_KEY_W] || keys[GLFW_KEY_UP])    camera.ProcessKeyboard(FORWARD, velocidadCamara);
+            velocidadCamara = deltaTime * 1.8f;   // Sala más pequeña y cámara más baja: sin esto se siente más rápida
+        if (keys[GLFW_KEY_W] || keys[GLFW_KEY_UP])  camera.ProcessKeyboard(FORWARD, velocidadCamara);
         if (keys[GLFW_KEY_S] || keys[GLFW_KEY_DOWN])  camera.ProcessKeyboard(BACKWARD, velocidadCamara);
         if (keys[GLFW_KEY_A] || keys[GLFW_KEY_LEFT])  camera.ProcessKeyboard(LEFT, velocidadCamara);
         if (keys[GLFW_KEY_D] || keys[GLFW_KEY_RIGHT]) camera.ProcessKeyboard(RIGHT, velocidadCamara);
@@ -3535,7 +3658,7 @@ void DoMovement()
             glm::vec3 posicionCamara = camera.GetPosition();
 
             //xcc- mantiene la altura de la camara
-            posicionCamara.y = 5.0f;
+            posicionCamara.y = 5.6f;
 
             //xcc- limita las paredes cuando la camara entra al Hub
             if (posicionCamara.z < 20.0f)
@@ -3574,7 +3697,7 @@ void DoMovement()
             glm::vec3 posicionCamara = camera.GetPosition();
 
             //xcc- mantiene la altura de la camara
-            posicionCamara.y = 1.7f;
+            posicionCamara.y = 2.2f;
 
             //xcc- limita las paredes laterales de trofeos
             posicionCamara.x = glm::clamp(posicionCamara.x, -5.7f, 5.7f);
@@ -3723,6 +3846,9 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         modoCamara = 0;
         camera.SetPosition(glm::vec3(0.0f, 3.0f, 10.0f));
 
+        //xcc- inicia el aviso de trofeos al entrar a la sala
+        tiempoMensajeTrofeos = glfwGetTime();
+
         //xcc- al entrar solo quedan encendidas las luces del podio
         lucesTrofeosCompletas = false;
 
@@ -3731,9 +3857,15 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
     }
 
     //xcc- regresa al Hub desde pista o trofeos
-    if (key == GLFW_KEY_H && action == GLFW_PRESS &&
-        (escenaActual == ESCENA_PISTA || escenaActual == ESCENA_TROFEOS))
+    if (key == GLFW_KEY_H && action == GLFW_PRESS && (escenaActual == ESCENA_PISTA || escenaActual == ESCENA_TROFEOS))
     {
+        //xcc- al salir de trofeos los premios nuevos ya fueron vistos
+        if (escenaActual == ESCENA_TROFEOS)
+        {
+            for (int i = 0; i < 9; i++)
+                trofeosNuevos[i] = false;
+        }
+    
         escenaActual = ESCENA_HUB;
         modoCamara = 0;
         camera.SetPosition(glm::vec3(0.0f, 3.0f, 30.0f));
