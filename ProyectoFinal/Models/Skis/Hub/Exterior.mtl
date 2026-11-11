@@ -1,0 +1,172 @@
+# Blender 5.1.2 MTL File: 'Hub_central_exterior.blend'
+# www.blender.org
+
+newmtl Blanco_Nieve
+Ns 18.000004
+Ka 1.000000 1.000000 1.000000
+Ks 0.055000 0.055000 0.055000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Blanco_Nieve.png
+
+newmtl EXT_Camino_Nieve
+Ns 6.000004
+Ka 1.000000 1.000000 1.000000
+Ks 0.030000 0.030000 0.030000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/EXT_Camino_Nieve.png
+
+newmtl EXT_Corteza
+Ns 6.000004
+Ka 1.000000 1.000000 1.000000
+Ks 0.030000 0.030000 0.030000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/EXT_Corteza.png
+
+newmtl EXT_Madera_Cerca
+Ns 6.000004
+Ka 1.000000 1.000000 1.000000
+Ks 0.030000 0.030000 0.030000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/EXT_Madera_Cerca.png
+
+newmtl EXT_Nieve_Pinos
+Ns 6.000004
+Ka 1.000000 1.000000 1.000000
+Ks 0.030000 0.030000 0.030000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/EXT_Nieve_Pinos.png
+
+newmtl EXT_Piedra_Clara
+Ns 6.000004
+Ka 1.000000 1.000000 1.000000
+Ks 0.030000 0.030000 0.030000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/EXT_Piedra_Clara.png
+
+newmtl EXT_Pino_Claro
+Ns 6.000004
+Ka 1.000000 1.000000 1.000000
+Ks 0.030000 0.030000 0.030000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/EXT_Pino_Claro.png
+
+newmtl EXT_Pino_Verde
+Ns 6.000004
+Ka 1.000000 1.000000 1.000000
+Ks 0.030000 0.030000 0.030000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/EXT_Pino_Verde.png
+
+newmtl EXT_Roca_Gris
+Ns 6.000004
+Ka 1.000000 1.000000 1.000000
+Ks 0.030000 0.030000 0.030000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/EXT_Roca_Gris.png
+
+newmtl Hierro_Negro
+Ns 18.000004
+Ka 1.000000 1.000000 1.000000
+Ks 0.055000 0.055000 0.055000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Hierro_Negro.png
+
+newmtl Luz_Farol
+Ns 18.000004
+Ka 1.000000 1.000000 1.000000
+Ks 0.055000 0.055000 0.055000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Luz_Farol.png
+map_Ke Texturas/Luz_Farol.png
+
+newmtl Madera_Cerca
+Ns 18.000004
+Ka 1.000000 1.000000 1.000000
+Ks 0.055000 0.055000 0.055000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Madera_Cerca.png
+
+newmtl Madera_Oscura
+Ns 18.000004
+Ka 1.000000 1.000000 1.000000
+Ks 0.055000 0.055000 0.055000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Madera_Oscura.png
+
+newmtl Madera_Sombras
+Ns 18.000004
+Ka 1.000000 1.000000 1.000000
+Ks 0.055000 0.055000 0.055000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Madera_Sombras.png
+
+newmtl Piedra_Gris
+Ns 18.000004
+Ka 1.000000 1.000000 1.000000
+Ks 0.055000 0.055000 0.055000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Piedra_Gris.png
+
+newmtl Rotulo_Casa
+Ns 18.000004
+Ka 1.000000 1.000000 1.000000
+Ks 0.055000 0.055000 0.055000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Rotulo_Casa.png
+
+newmtl Verde_Pino
+Ns 18.000004
+Ka 1.000000 1.000000 1.000000
+Ks 0.055000 0.055000 0.055000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Texturas/Verde_Pino.png

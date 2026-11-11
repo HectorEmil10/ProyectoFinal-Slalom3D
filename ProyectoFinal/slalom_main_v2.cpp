@@ -431,7 +431,14 @@ const char* NOMBRES_EQUIPAMIENTO[3] = {
 
 // Vector para almacenar las texturas disponibles
 std::vector<GLuint> opcionesTrajes;
-int indiceTrajeActual = 0; // 0 = Turquesa, 1 = Rojo
+int indiceTrajeActual = 0; // 0 = Turquesa, 1 = Rojo, 2 = Negro
+const char* NOMBRES_TRAJES[3] = { "TURQUESA", "ROJO", "NEGRO" };
+
+// Texturas del traje que se muestra en el Hub (casillero). Mismo orden que opcionesTrajes
+std::vector<GLuint> opcionesTrajesHub;
+// Mallas del Hub sin textura en el .mtl (Material.001 / Material.002): son el traje del casillero
+std::vector<size_t> mallasTrajeHub;
+int trajeHubAplicado = -1;   // Traje que tienen puesto ahora las mallas del Hub (-1 = ninguno)
 
 //                                   vel   lat   niebla   sol   fov    vib   colorNiebla               colorSol                colorAmbiente
 const ParametrosAmbiente NIVELES[3] = {
@@ -594,6 +601,51 @@ void ForzarTexturaEnModelo(Model& modelo, GLuint texID)
             modelo.meshes[m].textures[0].id = texID;
         }
     }
+}
+
+// Localiza en el Hub las mallas que el .mtl dejó sin textura (el traje del casillero).
+// Debe llamarse UNA vez justo después de cargar el modelo, antes de asignarles textura.
+void DetectarMallasTrajeHub(Model& hub)
+{
+    mallasTrajeHub.clear();
+    for (size_t m = 0; m < hub.meshes.size(); m++)
+    {
+        if (hub.meshes[m].textures.empty())
+        {
+            mallasTrajeHub.push_back(m);
+            std::cout << "[Hub] Malla sin textura (traje) #" << m
+                << " con " << hub.meshes[m].vertices.size() << " vertices." << std::endl;
+        }
+    }
+    trajeHubAplicado = -1;
+}
+
+// Pone en el Hub la textura del traje elegido (igual que el esquiador). Solo trabaja
+// cuando el traje cambia, así que se puede llamar en cada cuadro sin costo.
+void AplicarTrajeHub(Model& hub)
+{
+    if (opcionesTrajesHub.empty() || mallasTrajeHub.empty() || trajeHubAplicado == indiceTrajeActual)
+        return;
+
+    GLuint texID = opcionesTrajesHub[indiceTrajeActual % (int)opcionesTrajesHub.size()];
+    for (size_t i = 0; i < mallasTrajeHub.size(); i++)
+    {
+        Mesh& malla = hub.meshes[mallasTrajeHub[i]];
+        if (malla.textures.empty())
+        {
+            Texture t;
+            t.id = texID;
+            t.type = "texture_diffuse";
+            malla.textures.push_back(t);
+        }
+        else
+        {
+            malla.textures[0].id = texID;
+        }
+    }
+    trajeHubAplicado = indiceTrajeActual;
+    std::cout << "[Hub] Traje aplicado al casillero: indice " << indiceTrajeActual
+        << " (textura " << texID << ", " << mallasTrajeHub.size() << " malla(s))" << std::endl;
 }
 
 // Prototipos de funciones de contrincantes
@@ -1234,9 +1286,15 @@ int main()
     opcionesTrajes.push_back(texTrajeTurquesa);
     opcionesTrajes.push_back(texTrajeRojo);
 
-    // 3ra skin para que Jugador, Rival 1 y Rival 2 siempre tengan trajes distintos
-    GLuint texTrajeDorado = CrearTexturaTrajeProcedural();
-    opcionesTrajes.push_back(texTrajeDorado);
+    // 3ra skin (negra) para que Jugador, Rival 1 y Rival 2 siempre tengan trajes distintos
+    GLuint texTrajeNegro = CargarTextura("images/traje_negro.png");
+    opcionesTrajes.push_back(texTrajeNegro);
+
+    // Traje que se ve en el casillero del Hub (mismo orden: turquesa, rojo, negro)
+    opcionesTrajesHub.push_back(CargarTextura("images/traje_turquesa_hub.png"));
+    opcionesTrajesHub.push_back(CargarTextura("images/traje_rojo_hub.png"));
+    opcionesTrajesHub.push_back(CargarTextura("images/traje_negro_hub.png"));
+    DetectarMallasTrajeHub(HubCentral);
 
     Model PechoModel((char*)"Models/Esquiador/pecho.obj");
     Model CaderasModel((char*)"Models/Esquiador/caderas.obj");
@@ -1432,6 +1490,7 @@ int main()
         /* PistaCompleta.Draw(lightingShader); */
         if (escenaActual == ESCENA_HUB)
         {
+            AplicarTrajeHub(HubCentral);   // El traje del casillero sigue al del personaje
             HubCentral.Draw(lightingShader);
 
             //xcc- dibuja el exterior del Hub
@@ -3081,11 +3140,11 @@ void DibujarHUDHub(Shader& hudShader)
         if (aNivel > 0.0f)
             DibujarTexto(hudShader, NOMBRES_NIVEL[nivelActual], 0.0f, SCREEN_HEIGHT * 0.42f, 6.0f * e, glm::vec4(1.0f, 0.75f, 0.35f, aNivel), true);
 
-        //xcc- muestra las opciones de equipamiento
-        DibujarTexto(hudShader, "EQUIPAMIENTO: 4 5 6", 20.0f * e, 100.0f * e, 3.0f * e, glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), false);
+        //xcc- indica como cambiar el traje
+        DibujarTexto(hudShader, "CAMBIAR TRAJE: E", 20.0f * e, 100.0f * e, 3.0f * e, glm::vec4(1.0f, 1.0f, 1.0f, 0.9f), false);
 
-        //xcc- muestra el equipamiento actual
-        DibujarTexto(hudShader, NOMBRES_EQUIPAMIENTO[equipamientoSeleccionado], 20.0f * e, 140.0f * e, 3.0f * e, glm::vec4(1.0f, 0.85f, 0.4f, 1.0f), false);
+        //xcc- muestra el traje actual
+        DibujarTexto(hudShader, NOMBRES_TRAJES[indiceTrajeActual], 20.0f * e, 140.0f * e, 3.0f * e, glm::vec4(1.0f, 0.85f, 0.4f, 1.0f), false);
     }
 
     //xcc- muestra aviso cerca de la salida a pista
@@ -3609,13 +3668,6 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 
     }
 
-    //xcc- selecciona equipamiento desde el panel del Hub
-    if (action == GLFW_PRESS && key >= GLFW_KEY_4 && key <= GLFW_KEY_6 && escenaActual == ESCENA_HUB && CercaPanelConfiguracion())
-    {
-        equipamientoSeleccionado = key - GLFW_KEY_4;
-
-        std::cout << "Equipamiento seleccionado: " << NOMBRES_EQUIPAMIENTO[equipamientoSeleccionado] << std::endl; //solamente funcionará cuando este cerca del panel.
-    }
 }
 
 /**
