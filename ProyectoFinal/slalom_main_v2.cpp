@@ -318,7 +318,11 @@ std::vector<glm::vec3> posicionesTrofeos = {
 };
 
 //xcc- guarda cuales trofeos se han desbloqueado
-bool trofeosDesbloqueados[4] = { false, false, false, false };
+//xcc- guarda el estado de los nueve trofeos
+bool trofeosDesbloqueados[9] = {
+    false, false, false, false, false,
+    false, false, false, false
+};
 
 //xcc- controla las luces generales de la sala de trofeos
 bool lucesTrofeosCompletas = false;
@@ -1227,6 +1231,17 @@ int main()
     //xcc- carga la parte nueva de la sala de trofeos
     Model SalaTrofeosNueva((char*)"Models/Trofeos/Sala_Trofeos_parte_nueva.obj");
 
+    //xcc- carga los nueve trofeos desbloqueables
+    Model TrofeoMaestro((char*)"Models/Trofeos/Maestro_del_slalom.obj");
+    Model TrofeoVelocistaFacil((char*)"Models/Trofeos/Velocista_facil.obj");
+    Model TrofeoVelocistaMedio((char*)"Models/Trofeos/Velocista_medio.obj");
+    Model TrofeoVelocistaDificil((char*)"Models/Trofeos/Velocista_dificil.obj");
+    Model TrofeoCampeonFacil((char*)"Models/Trofeos/Campeon_facil.obj");
+    Model TrofeoCampeonMedio((char*)"Models/Trofeos/Campeon_medio.obj");
+    Model TrofeoCampeonDificil((char*)"Models/Trofeos/Campeon_dificil.obj");
+    Model TrofeoTormenta((char*)"Models/Trofeos/Contra_la_tormenta.obj");
+    Model TrofeoLeyenda((char*)"Models/Trofeos/Leyenda_del_slalom.obj");
+
     // Cargar las opciones de trajes para el sistema de personalización
     GLuint texTrajeTurquesa = CargarTextura("images/traje_turquesa.png");
     GLuint texTrajeRojo = CargarTextura("images/traje_rojo.png");
@@ -1523,11 +1538,26 @@ int main()
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             glUniform1i(glGetUniformLocation(lightingShader.Program, "transparency"), 1);
 
+
+            //xcc- dibuja solamente los trofeos desbloqueados
+            if (trofeosDesbloqueados[0]) TrofeoMaestro.Draw(lightingShader);
+            if (trofeosDesbloqueados[1]) TrofeoVelocistaFacil.Draw(lightingShader);
+            if (trofeosDesbloqueados[2]) TrofeoVelocistaMedio.Draw(lightingShader);
+            if (trofeosDesbloqueados[3]) TrofeoVelocistaDificil.Draw(lightingShader);
+            if (trofeosDesbloqueados[4]) TrofeoCampeonFacil.Draw(lightingShader);
+            if (trofeosDesbloqueados[5]) TrofeoCampeonMedio.Draw(lightingShader);
+            if (trofeosDesbloqueados[6]) TrofeoCampeonDificil.Draw(lightingShader);
+            if (trofeosDesbloqueados[7]) TrofeoTormenta.Draw(lightingShader);
+            if (trofeosDesbloqueados[8]) TrofeoLeyenda.Draw(lightingShader);
+           
+            //se dibuja despues por que si no podria quedar del vidrio con la transparencia 
+
             //xcc- dibuja la sala de trofeos
             SalaTrofeos.Draw(lightingShader);
 
             //xcc- dibuja la parte nueva de la sala
             SalaTrofeosNueva.Draw(lightingShader);
+
 
             //xcc- desactiva transparencia para los demas objetos
             glUniform1i(glGetUniformLocation(lightingShader.Program, "transparency"), 0);
@@ -2818,6 +2848,54 @@ void ActualizarCarrera(Model& terreno)
         std::cout << "  META CRUZADA - POSICION: " << posicionJugadorActual << " LUGAR" << std::endl;
         std::cout << "  Tiempo del Jugador: " << tiempoFinalCarrera << " seg" << std::endl;
         std::cout << "==========================================\n" << std::endl;
+
+
+        //xcc- desbloquea Maestro del Slalom al completar todas las puertas
+        if (puertasCruzadasCorrectamente == (int)puertas.size() && !trofeosDesbloqueados[0])
+        {
+            trofeosDesbloqueados[0] = true;
+            std::cout << "Trofeo desbloqueado: Maestro del Slalom" << std::endl;
+        }
+
+        //xcc- desbloquea Campeon segun la dificultad al quedar en primer lugar
+        if (posicionJugadorActual == 1)
+        {
+            if (nivelActual == 0 && !trofeosDesbloqueados[4])
+            {
+                trofeosDesbloqueados[4] = true;
+                std::cout << "Trofeo desbloqueado: Campeon Facil" << std::endl;
+            }
+
+            if (nivelActual == 1 && !trofeosDesbloqueados[5])
+            {
+                trofeosDesbloqueados[5] = true;
+                std::cout << "Trofeo desbloqueado: Campeon Medio" << std::endl;
+            }
+
+            if (nivelActual == 2 && !trofeosDesbloqueados[6])
+            {
+                trofeosDesbloqueados[6] = true;
+                std::cout << "Trofeo desbloqueado: Campeon Dificil" << std::endl;
+            }
+        }
+
+        //xcc- desbloquea Contra la Tormenta al ganar con ventisca
+        if (posicionJugadorActual == 1 && ventiscaActiva && !trofeosDesbloqueados[7])
+        {
+            trofeosDesbloqueados[7] = true;
+            std::cout << "Trofeo desbloqueado: Contra la Tormenta" << std::endl;
+        }
+
+        //xcc- desbloquea Leyenda al conseguir los otros ocho trofeos
+        if (trofeosDesbloqueados[0] && trofeosDesbloqueados[1] &&
+            trofeosDesbloqueados[2] && trofeosDesbloqueados[3] &&
+            trofeosDesbloqueados[4] && trofeosDesbloqueados[5] &&
+            trofeosDesbloqueados[6] && trofeosDesbloqueados[7] &&
+            !trofeosDesbloqueados[8])
+        {
+            trofeosDesbloqueados[8] = true;
+            std::cout << "Trofeo desbloqueado: Leyenda del Slalom" << std::endl;
+        }
     }
 }
 
@@ -3476,6 +3554,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 
         //xcc- al entrar solo quedan encendidas las luces del podio
         lucesTrofeosCompletas = false;
+
 
         std::cout << "Cambio de escena: Hub -> Trofeos" << std::endl;
     }

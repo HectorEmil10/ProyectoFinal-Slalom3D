@@ -1,7 +1,7 @@
-# Blender 5.1.2 MTL File: 'None'
+# Blender 5.1.2 MTL File: 'Sala_Trofeos.blend'
 # www.blender.org
 
-newmtl Logro_Velocista_Medio
+newmtl Logro_Tormenta
 Ns 15.000002
 Ka 1.000000 1.000000 1.000000
 Ks 0.070000 0.070000 0.070000
@@ -9,7 +9,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
-map_Kd C:/Users/efcru/Downloads/Solo_Trofeos_9_Logros/Texturas/Logro_Velocista_Medio.png
+map_Kd Texturas/Logro_Velocista_Medio.png
 
 newmtl Madera_Oscura
 Ns 15.000002
@@ -19,24 +19,24 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
-map_Kd C:/Users/efcru/Downloads/Solo_Trofeos_9_Logros/Texturas/Madera_Oscura.png
+map_Kd Texturas/Madera_Oscura.png
 
-newmtl TrofeoModelo_Azul_0
+newmtl TrofeoModelo_Cristal_0
 Ns 15.000002
 Ka 1.000000 1.000000 1.000000
 Ks 0.070000 0.070000 0.070000
 Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 illum 2
-map_Kd C:/Users/efcru/Downloads/Solo_Trofeos_9_Logros/Texturas/TrofeoModelo_Azul_0.png
-map_d C:/Users/efcru/Downloads/Solo_Trofeos_9_Logros/Texturas/TrofeoModelo_Azul_0.png
+map_Kd Texturas/TrofeoModelo_Cristal_0.png
+map_d Texturas/TrofeoModelo_Cristal_0.png
 
-newmtl TrofeoModelo_Azul_1
+newmtl TrofeoModelo_Cristal_1
 Ns 15.000002
 Ka 1.000000 1.000000 1.000000
 Ks 0.070000 0.070000 0.070000
 Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 illum 2
-map_Kd C:/Users/efcru/Downloads/Solo_Trofeos_9_Logros/Texturas/TrofeoModelo_Azul_1.png
-map_d C:/Users/efcru/Downloads/Solo_Trofeos_9_Logros/Texturas/TrofeoModelo_Azul_1.png
+map_Kd Texturas/TrofeoModelo_Cristal_1.png
+map_d Texturas/TrofeoModelo_Cristal_1.png
