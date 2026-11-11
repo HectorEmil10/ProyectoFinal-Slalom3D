@@ -4093,7 +4093,8 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         camSuaveInit = false; // <--- AÑADIR, reinicia la camara suave al cambiar de escena
         escenaActual = ESCENA_HUB;
         modoCamara = 0;
-        camera.SetPosition(glm::vec3(0.0f, 3.0f, 30.0f));
+        //camera.SetPosition(glm::vec3(0.0f, 3.0f, 30.0f));
+        camera.SetPosition(glm::vec3(20.9701f, 3.0f, -0.190063f));
         std::cout << "Cambio de escena: regreso al Hub" << std::endl;
     }
 
