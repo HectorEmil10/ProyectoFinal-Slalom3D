@@ -4,16 +4,14 @@
  *  FACULTAD DE INGENIERÍA
  * ============================================================================
  *  Proyecto        : Juego de Slalom - Escenario Interactivo 3D
- *  Asignatura      : ______________________________________
- *  Grupo / Semestre: ______________________________________
- *  Profesor        : ______________________________________
- *  Fecha de creación: 07/11/2026
+ *  Asignatura      : Laboratorio de Computación Gráfica e Interacción Humano-Computadora
+ *  Grupo / Semestre: Séptimo semestre
+ *  Profesor        : M.D.I. Edcel Fuerte Martínez
  *
  *  Integrantes del equipo:
- *      1. ______________________________________  No. de cuenta: __________
- *      2. ______________________________________  No. de cuenta: __________
- *      3. ______________________________________  No. de cuenta: __________
- *      4. ______________________________________  No. de cuenta: __________
+ *      1. Bermejo Flores José Tristán             No. de cuenta: 321016719
+ *      2. Cruz Basilio Ximena Carolina            No. de cuenta: 321116424
+ *      3. Parra Fernández Héctor Emilio           No. de cuenta: 321134567
  *
  *  Descripción:
  *      Aplicación gráfica en OpenGL 3.3 (GLFW + GLEW + GLM + SOIL2) que
@@ -54,7 +52,7 @@
  // ============================================================================
  //  ETAPA 1. INCLUSIONES
  // ============================================================================
-
+ // 
  // Biblioteca estándar
 #include <iostream>
 #include <string>
@@ -194,6 +192,17 @@ const float COMI_LATERAL = 8.0f;    // distancia al eje de la pista (+ derecha, 
 const float COMI_AVANCE = 3.0f;    // unidades por delante de la línea de salida
 const float COMI_ESCALA = 1.0f;    // ajustar a ojo (el esquiador mide ~3.5 u.)
 const float COMI_ROT_EXTRA = 0.0f;    // giro extra sobre la dirección de la pista (prueba 0/45/-45)
+
+// ---- Comisario de meta ----
+const float COMI_META_LATERAL = -10.0f;  // lado opuesto al de salida; fuera de ANCHO_PUERTA_META (7.5)
+const float COMI_META_AVANCE = -4.0f;   // unidades antes de la línea de meta (hacia la salida)
+const float COMI_META_ROT_EXTRA = 180.0f;  // 180 = mira a los esquiadores que llegan
+const float COMI_META_OSCIL = 18.0f;   // amplitud del saludo (grados)
+const float COMI_META_VEL_SALUDO = 8.0f;   // rad/s
+
+float comiMetaAngulo = 0.0f;
+glm::vec3 comiMetaPos(0.0f);
+float comiMetaRotY = 0.0f;
 
 // Pivote en coordenadas ABSOLUTAS del .obj: Blender (x,y,z) -> (x, z, -y). ¡Placeholder!
 const glm::vec3 PIV_COMI_HOMBRO(-0.53f, 2.95f, -0.03f);
@@ -890,6 +899,22 @@ void ActualizarComisario(float dt)
 
     float paso = velocidad * dt;
     comiAnguloBrazo += glm::clamp(objetivo - comiAnguloBrazo, -paso, paso);
+
+    // ---- Comisario de meta: brazo arriba y saludando cuando el jugador cruza ----
+    float objetivoM, velM;
+    if (estadoCarrera == 2)
+    {
+        objetivoM = COMI_ANG_LISTO + COMI_META_OSCIL * std::sin((float)glfwGetTime() * COMI_META_VEL_SALUDO);
+        velM = 400.0f;
+    }
+    else
+    {
+        objetivoM = COMI_ANG_REPOSO;
+        velM = 120.0f;
+    }
+    float pasoM = velM * dt;
+    comiMetaAngulo += glm::clamp(objetivoM - comiMetaAngulo, -pasoM, pasoM);
+
 }
 
 // alzado: 0 = brazo en reposo, 1 = brazo levantado. oscil: vaivén del antebrazo (grados)
@@ -1404,6 +1429,16 @@ void PosicionarComisario(Model& terreno)
     comiPos.z = posSalida.z + dirP.y * COMI_AVANCE + dirD.y * COMI_LATERAL;
     comiPos.y = ObtenerAlturaTerreno(terreno, comiPos.x, comiPos.z, posSalida.y);  // pies al piso
     comiRotY = glm::degrees(std::atan2(dirP.x, dirP.y)) + COMI_ROT_EXTRA;
+
+    // ---- Comisario de meta ----
+    glm::vec2 vm = glm::vec2(posMeta.x - posSalida.x, posMeta.z - posSalida.z);
+    glm::vec2 dirM = (glm::length(vm) > 0.001f) ? glm::normalize(vm) : glm::vec2(1.0f, 0.0f);
+    glm::vec2 dirMD(dirM.y, -dirM.x);
+
+    comiMetaPos.x = posMeta.x + dirM.x * COMI_META_AVANCE + dirMD.x * COMI_META_LATERAL;
+    comiMetaPos.z = posMeta.z + dirM.y * COMI_META_AVANCE + dirMD.y * COMI_META_LATERAL;
+    comiMetaPos.y = ObtenerAlturaTerreno(terreno, comiMetaPos.x, comiMetaPos.z, posMeta.y);
+    comiMetaRotY = glm::degrees(std::atan2(dirM.x, dirM.y)) + COMI_META_ROT_EXTRA;
 }
 
 // ---- Ventisca ----
@@ -2076,6 +2111,18 @@ int main()
 
             glm::mat4 mBrazoC = ArticularPieza(baseC, PIV_COMI_HOMBRO, glm::vec3(comiAnguloBrazo, 0.0f, 0.0f));
             glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(mBrazoC));
+            ComisarioBrazoModel.Draw(lightingShader);
+
+            // ---- Comisario de meta ----
+            glm::mat4 baseM = glm::translate(glm::mat4(1.0f), comiMetaPos);
+            baseM = glm::rotate(baseM, glm::radians(comiMetaRotY), glm::vec3(0.0f, 1.0f, 0.0f));
+            baseM = glm::scale(baseM, glm::vec3(COMI_ESCALA));
+
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(baseM));
+            ComisarioCuerpoModel.Draw(lightingShader);
+
+            glm::mat4 mBrazoM = ArticularPieza(baseM, PIV_COMI_HOMBRO, glm::vec3(comiMetaAngulo, 0.0f, 0.0f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(mBrazoM));
             ComisarioBrazoModel.Draw(lightingShader);
 
             // Lambda reutilizable para dibujar cualquier esquiador articulado (Jugador o Contrincantes)
@@ -4087,14 +4134,19 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         {
             for (int i = 0; i < 9; i++)
                 trofeosNuevos[i] = false;
+            camera.SetPosition(glm::vec3(20.9701f, 3.0f, -0.190063f));
+        }
+        else 
+        {
+            camera.SetPosition(glm::vec3(0.0f, 3.0f, 30.0f));
         }
     
 
         camSuaveInit = false; // <--- AÑADIR, reinicia la camara suave al cambiar de escena
         escenaActual = ESCENA_HUB;
         modoCamara = 0;
-        //camera.SetPosition(glm::vec3(0.0f, 3.0f, 30.0f));
-        camera.SetPosition(glm::vec3(20.9701f, 3.0f, -0.190063f));
+        
+        
         std::cout << "Cambio de escena: regreso al Hub" << std::endl;
     }
 

@@ -9,7 +9,6 @@
  *                    Trofeos). Cada esquema agrupa la luz direccional, las
  *                    luces puntuales, las luces focales y la niebla, y se
  *                    envía al shader de iluminación con EnviarEsquema().
- *  Fecha de creación: 08/11/2026
  *
  *  Uso:
  *      EsquemaIluminacion esquema = EsquemaHub(tiempo, nivel, interior, base);
